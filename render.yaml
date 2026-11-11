@@ -1,0 +1,23 @@
+# Despliegue en Render (Blueprint): web + API en un solo servicio.
+# Plan gratuito: el disco es efímero, así que la base de datos se vuelve a crear con las cuentas de
+# demostración cuando el servicio se reinicia. Para conservar datos, usa un plan de pago y activa el disco.
+services:
+  - type: web
+    name: surtigas-turnos
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: DATA_DIR
+        value: /tmp/surtigas-data
+    # Plan de pago con datos persistentes: cambia plan a starter, DATA_DIR a /data y descomenta:
+    # disk:
+    #   name: datos
+    #   mountPath: /data
+    #   sizeGB: 1
