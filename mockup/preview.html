@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mockup · Surtigas</title>
+    <style>
+      body { margin: 0; background: #1b1f2e; font-family: system-ui, sans-serif; color: #cfd6f0; padding: 24px; }
+      h1 { font-size: 18px; margin: 0 0 18px; }
+      .grid { display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); align-items: start; }
+      figcaption { font-size: 13px; margin-bottom: 8px; color: #9aa6c8; }
+      figure { margin: 0; }
+      img { width: 100%; height: auto; display: block; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+    </style>
+  </head>
+  <body>
+    <h1>Mockup · frames para Figma (arrastra los .svg de /figma al lienzo)</h1>
+    <div class="grid" id="g"></div>
+    <script>
+      const f = [
+        ['00-design-tokens', '00 · Design tokens'], ['01-login', '01 · Login por rol'], ['02-dashboard-encargado', '02 · Dashboard Encargado'],
+        ['03-verificacion-4-niveles', '03 · Verificación en 4 niveles'], ['04-recomendacion-simulacion', '04 · Recomendación y simulación'],
+        ['05-colaborador-movil', '05 · Colaborador (móvil)'], ['06-admin-gobernanza', '06 · Admin · Gobernanza'],
+        ['07-admin-parametros-validacion', '07 · Admin · Parámetros y validación'], ['08-trazabilidad', '08 · Trazabilidad'],
+        ['09-historico-digiturno', '09 · Histórico Digiturno'],
+      ]
+      document.getElementById('g').innerHTML = f.map(([n, t]) => `<figure><figcaption>${t}</figcaption><img src="./figma/${n}.svg"></figure>`).join('')
+    </script>
+  </body>
+</html>
