@@ -22,6 +22,7 @@ const GOV = [
 ]
 
 export default function Admin() {
+  const { user } = useApp()
   const [view, setView] = useState('gov')
   const items = [
     { key: 'gov', label: 'Gobernanza y piloto', icon: Scale },
@@ -33,7 +34,7 @@ export default function Admin() {
     <div className="shell">
       <Sidebar items={items} active={view} onChange={setView} />
       <main className="main">
-        <Topbar title={titles[view][0]} subtitle={titles[view][1]} userName="Luis Herrera" roleLabel="Administrador" />
+        <Topbar title={titles[view][0]} subtitle={titles[view][1]} userName={user?.name ?? 'Luis Herrera'} roleLabel="Administrador" />
         <motion.div key={view} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
             {view === 'gov' && <Governance />}
             {view === 'params' && <Params />}

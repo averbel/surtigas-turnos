@@ -57,7 +57,7 @@ export function Toasts() {
 }
 
 export function Topbar({ title, subtitle, userName, roleLabel }) {
-  const { minutes, running, setRunning, setRole, mode } = useApp()
+  const { minutes, running, setRunning, setRole, mode, room } = useApp()
   return (
     <div className="topbar">
       <div>
@@ -66,6 +66,7 @@ export function Topbar({ title, subtitle, userName, roleLabel }) {
       </div>
       <div className="grow" />
       {mode === 'api' && <span className="chip ok" title="Datos y reglas procesados en el servidor"><span className="dot" /> Servidor · SQLite</span>}
+      {mode === 'api' && room && <span className="chip info" title="Comparte este código para ver la misma demo en otra sesión">Sala {room}</span>}
       <div className="clock">
         <Radio size={16} color="var(--ok)" className="pulse" />
         <span className="mono">{fmtHour(minutes / 60)}</span>

@@ -14,21 +14,27 @@ const SHIFT = [
 ]
 
 export default function Collaborator() {
-  const { caseState, lauraIn, registerAttendance, respondPresent, respondAbsent, minutes, setRole, person, params, sendCorrection } = useApp()
+  const { caseState, lauraIn, registerAttendance, respondPresent, respondAbsent, minutes, setRole, person, params, sendCorrection, mode, room, user } = useApp()
+  // Quien entra ve su propio nombre; el caso de la demo pertenece a Laura Mendoza.
+  const me = user?.name ?? person.name
+  const isCaseOwner = me === person.name
+  const [ownIn, setOwnIn] = useState(false)
+  const checkedIn = isCaseOwner ? lauraIn : ownIn
   const [corrText, setCorrText] = useState('')
   const office = officeById(person.office).name
   const [auth, setAuth] = useState('idle') // idle | scanning
   const [corr, setCorr] = useState(false)
   const [open, setOpen] = useState(false)
 
-  const asking = caseState?.stage === 'consultando'
-  const escalated = caseState?.stage === 'escalado'
+  const asking = caseState?.stage === 'consultando' && isCaseOwner
+  const escalated = caseState?.stage === 'escalado' && isCaseOwner
 
   const punch = () => {
-    if (lauraIn || auth !== 'idle') return
+    if (checkedIn || auth !== 'idle') return
     setAuth('scanning')
     setTimeout(() => {
       registerAttendance()
+      setOwnIn(true)
       setAuth('idle')
     }, 1500)
   }
@@ -41,17 +47,18 @@ export default function Collaborator() {
           <div className="row">
             <Logo size={36} />
             <div style={{ lineHeight: 1.2 }}>
-              <div className="display" style={{ fontWeight: 700 }}>Hola, Laura 👋</div>
+              <div className="display" style={{ fontWeight: 700 }}>Hola, {me.split(' ')[0]} 👋</div>
               <div className="muted" style={{ fontSize: 12 }}>{DOW_LABEL[params.dow]} · {office}</div>
             </div>
             <span className="sp" />
+            {mode === 'api' && room && <span className="chip info" title="Código de tu sala de demostración">Sala {room}</span>}
             <div className="clock" style={{ padding: '6px 12px', fontSize: 14 }}><span className="mono">{fmtHour(minutes / 60)}</span></div>
             <button className="btn" style={{ padding: 8 }} onClick={() => setRole(null)} title="Cambiar de rol"><LogOut size={16} /></button>
           </div>
 
           {/* Confirmación activa (Nivel 2) */}
           <AnimatePresence>
-            {asking && <Ask key="ask" deadline={caseState.deadline} onYes={respondPresent} onNo={respondAbsent} />}
+            {asking && <Ask key="ask" name={me.split(' ')[0]} deadline={caseState.deadline} onYes={respondPresent} onNo={respondAbsent} />}
           </AnimatePresence>
           <AnimatePresence>
             {escalated && (
@@ -69,13 +76,13 @@ export default function Collaborator() {
           <div className="punch">
             <div className="eyebrow" style={{ color: 'var(--muted)' }}>Registro de asistencia desde tu puesto</div>
             <div className="display" style={{ fontSize: 15, marginTop: 6, color: 'var(--text)' }}>Turno 07:30 – 16:30 · Caja 2</div>
-            <motion.button className={`punch-btn ${lauraIn ? 'done' : ''}`} onClick={punch} whileHover={!lauraIn ? { scale: 1.05 } : {}} whileTap={!lauraIn ? { scale: 0.94 } : {}}
+            <motion.button className={`punch-btn ${checkedIn ? 'done' : ''}`} onClick={punch} whileHover={!checkedIn ? { scale: 1.05 } : {}} whileTap={!checkedIn ? { scale: 0.94 } : {}}
               transition={{ duration: 2, repeat: Infinity }}>
-              {!lauraIn && [0, 1].map((i) => (
+              {!checkedIn && [0, 1].map((i) => (
                 <motion.span key={i} className="ring" animate={{ scale: [1, 1.25], opacity: [0.7, 0] }} transition={{ duration: 2, repeat: Infinity, delay: i * 1 }} />
               ))}
               <AnimatePresence mode="wait">
-                {lauraIn ? (
+                {checkedIn ? (
                   <motion.div key="ok" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 14 }}>
                     <CheckCircle2 size={84} strokeWidth={2.2} />
                   </motion.div>
@@ -94,7 +101,7 @@ export default function Collaborator() {
               </AnimatePresence>
             </motion.button>
             <div style={{ minHeight: 24, fontSize: 13.5, color: 'var(--text)', marginTop: 12 }}>
-              {lauraIn ? 'Ingreso registrado. ¡Que tengas un excelente turno!' : auth === 'scanning' ? 'Autenticando…' : 'Autentícate para marcar tu llegada'}
+              {checkedIn ? 'Ingreso registrado. ¡Que tengas un excelente turno!' : auth === 'scanning' ? 'Autenticando…' : 'Autentícate para marcar tu llegada'}
             </div>
           </div>
 
@@ -170,7 +177,7 @@ export default function Collaborator() {
   )
 }
 
-function Ask({ deadline, onYes, onNo }) {
+function Ask({ name, deadline, onYes, onNo }) {
   const total = 16000
   const [left, setLeft] = useState(Math.max(0, deadline - Date.now()))
   useEffect(() => {
@@ -189,7 +196,7 @@ function Ask({ deadline, onYes, onNo }) {
           <text x="31" y="36" textAnchor="middle" fontSize="15" fontWeight="700" fill="#0f172a" fontFamily="Sora">{Math.ceil(left / 1000)}</text>
         </svg>
         <div>
-          <div className="display" style={{ fontWeight: 700, fontSize: 16 }}>¿Estás en tu puesto, Laura?</div>
+          <div className="display" style={{ fontWeight: 700, fontSize: 16 }}>¿Estás en tu puesto, {name}?</div>
           <div className="muted" style={{ fontSize: 12.5, marginTop: 3, lineHeight: 1.45 }}>No encontramos tu registro de ingreso. Confírmanos tu situación.</div>
         </div>
       </div>

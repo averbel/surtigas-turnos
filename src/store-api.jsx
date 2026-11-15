@@ -3,7 +3,7 @@
 // contexto que el modo local (store.jsx), de modo que las vistas no cambian.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ctx } from './store'
-import { api, getToken, setToken } from './api'
+import { api, getRoom, getToken, setRoom, setToken } from './api'
 import { OFFICES, DEFAULT_PARAMS, effectiveStaff, officeState, staffDeficit, statusFromWait } from './engine'
 
 const DEMO_MIN = 13 * 60 + 5
@@ -23,6 +23,7 @@ const STAGE_TOAST = {
 
 export function ApiProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [room, setRoomState] = useState(getRoom())
   const [booting, setBooting] = useState(!!getToken())
   const [srv, setSrv] = useState(EMPTY)
   const [dow, setDow] = useState(DEMO_DOW)
@@ -36,6 +37,8 @@ export function ApiProvider({ children }) {
   dowRef.current = dow
   const skew = useRef(0)
   const paramsDirty = useRef(false)
+  const govRef = useRef(EMPTY.governance)
+  const govInflight = useRef(0)
   const putTimer = useRef(null)
   const prev = useRef({ init: false })
 
@@ -57,6 +60,7 @@ export function ApiProvider({ children }) {
     setSrv((old) => ({
       ...s,
       params: paramsDirty.current ? old.params : s.params,
+      governance: govInflight.current > 0 ? old.governance : s.governance,
       caseState: s.caseState && s.caseState.deadline ? { ...s.caseState, deadline: s.caseState.deadline - skew.current } : s.caseState,
     }))
   }, [])
@@ -105,6 +109,8 @@ export function ApiProvider({ children }) {
     return () => clearInterval(i)
   }, [running])
 
+  useEffect(() => { if (govInflight.current === 0) govRef.current = srv.governance }, [srv.governance])
+
   const params = useMemo(() => ({ ...DEFAULT_PARAMS, ...srv.params, dow }), [srv.params, dow])
   const hour = minutes / 60
   const staffOf = useCallback((o) => effectiveStaff(o, srv.moves, srv.absences), [srv.moves, srv.absences])
@@ -147,9 +153,11 @@ export function ApiProvider({ children }) {
     }
   }, [applyState, logout, toast])
 
-  const login = useCallback(async (username, password) => {
-    const r = await api.post('/api/auth/login', { username, password })
+  const login = useCallback(async (username, password, roomCode) => {
+    const r = await api.post('/api/auth/login', { username, password, room: (roomCode || getRoom() || '').trim() || undefined })
     setToken(r.token)
+    setRoom(r.room)
+    setRoomState(r.room)
     prev.current = { init: false }
     setUser(r.user)
     return r.user
@@ -166,6 +174,7 @@ export function ApiProvider({ children }) {
     setMinutes(DEMO_MIN)
     return act(() => api.post('/api/demo/reset'))
   }, [act])
+  const reanalyze = useCallback(() => act(() => api.post('/api/recommendations/reanalyze', { simMin: minutesRef.current, dow: dowRef.current })), [act])
   const registerAttendance = useCallback(() => act(() => api.post('/api/attendance/checkin', { simMin: minutesRef.current })), [act])
   const respondPresent = useCallback(() => act(() => api.post('/api/cases/current/respond', { answer: 'present', simMin: minutesRef.current })), [act])
   const respondAbsent = useCallback(() => act(() => api.post('/api/cases/current/respond', { answer: 'absent', simMin: minutesRef.current })), [act])
@@ -194,11 +203,17 @@ export function ApiProvider({ children }) {
   const setDay = useCallback((d) => setDow(d), [])
   const jumpTo = useCallback((m) => setMinutes(Math.min(Math.max(m, MIN_CLOCK), MAX_CLOCK)), [])
 
+  // Varias activaciones seguidas se acumulan sobre la última versión local; mientras haya
+  // guardados en curso no se sobrescribe con el estado (más antiguo) que devuelve el servidor.
   const setGovDone = useCallback((next) => {
-    const g = typeof next === 'function' ? next(srv.governance) : next
+    const g = typeof next === 'function' ? next(govRef.current) : next
+    govRef.current = g
+    govInflight.current++
     setSrv((s) => ({ ...s, governance: g }))
-    api.put('/api/governance', g).catch((e) => toast('No se pudo guardar', e.message, 'warn'))
-  }, [srv.governance, toast])
+    api.put('/api/governance', g)
+      .catch((e) => toast('No se pudo guardar', e.message, 'warn'))
+      .finally(() => { govInflight.current--; if (govInflight.current === 0) refresh() })
+  }, [toast, refresh])
 
   const sendCorrection = useCallback(async (text) => {
     try {
@@ -213,14 +228,14 @@ export function ApiProvider({ children }) {
 
   const value = {
     mode: 'api',
-    user, login,
+    user, login, room, newRoom: () => { setRoom(null); setRoomState(null) },
     role: user?.role ?? null,
     setRole: (r) => { if (r === null) logout() },
     minutes, hour, running, setRunning, setMinutes, jumpTo,
     params, setParams, setDay,
     offices, staffOf,
     caseState, startCase, registerAttendance, respondPresent, respondAbsent, markReassigned, confirmAbsence,
-    rec: srv.rec, decideRec,
+    rec: srv.rec, decideRec, reanalyze,
     moves: srv.moves, absences: srv.absences,
     log: srv.log, toasts, toast,
     lauraIn: srv.lauraIn,

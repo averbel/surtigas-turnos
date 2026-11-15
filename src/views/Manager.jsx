@@ -12,7 +12,7 @@ import { DOW_LABEL, HIST, OFFICES, STATUS_LABEL, fmtHour, fmtWait, muOf, officeB
 const officeName = (id) => officeById(id)?.name
 
 export default function Manager() {
-  const { caseState, rec, params, offices } = useApp()
+  const { caseState, rec, params, offices, user } = useApp()
   const [view, setView] = useState('dash')
   const pendingCase = caseState && ['escalado', 'consultando', 'no_registrado'].includes(caseState.stage) ? 1 : 0
   const pendingRec = rec?.status === 'pendiente' ? 1 : 0
@@ -37,7 +37,7 @@ export default function Manager() {
     <div className="shell">
       <Sidebar items={items} active={view} onChange={setView} />
       <main className="main">
-        <Topbar title={titles[view][0]} subtitle={titles[view][1]} userName="Marta Ríos" roleLabel="Encargada de turnos" />
+        <Topbar title={titles[view][0]} subtitle={titles[view][1]} userName={user?.name ?? 'Marta Ríos'} roleLabel="Encargado de turnos" />
         <motion.div key={view} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
             {view === 'dash' && <Dashboard goto={setView} />}
             {view === 'verif' && <Verification />}
@@ -186,7 +186,7 @@ function Dashboard({ goto }) {
           <AnimatePresence initial={false}>
             {alerts.map((a) => (
               <motion.div key={a.k} layout className={`alert ${a.tone}`}
-                initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40, height: 0, padding: 0 }}>
+                initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, padding: 0 }}>
                 <div className="ic"><a.icon size={17} /></div>
                 <div style={{ flex: 1 }}>
                   <b>{a.title}</b>
@@ -394,7 +394,7 @@ export function Verification() {
 /* ───────────────────────── Recomendaciones ───────────────────────── */
 
 export function Recommendations() {
-  const { rec, decideRec, offices, caseState, params } = useApp()
+  const { rec, decideRec, reanalyze, offices, caseState, params } = useApp()
   const [pick, setPick] = useState(null)
 
   if (!rec)
@@ -512,6 +512,12 @@ export function Recommendations() {
                 <XCircle size={18} /> Rechazar
               </motion.button>
             </div>
+            {rec.status === 'rechazada' && (
+              <div className="row" style={{ marginTop: 16, gap: 12, flexWrap: 'wrap' }}>
+                <button className="btn btn-flame" onClick={reanalyze}><Sparkles size={16} /> Buscar otra alternativa</button>
+                <span className="muted" style={{ fontSize: 12.5 }}>El motor descartará lo que rechazaste y recalculará.</span>
+              </div>
+            )}
             <AnimatePresence>
               {rec.status === 'aprobada' && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ overflow: 'hidden' }}>

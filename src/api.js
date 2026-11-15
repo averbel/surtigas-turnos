@@ -7,6 +7,14 @@ export const setToken = (t) => {
   try { t ? sessionStorage.setItem(KEY, t) : sessionStorage.removeItem(KEY) } catch { /* sin almacenamiento */ }
 }
 
+const ROOM_KEY = 'surtigas_room'
+export const getRoom = () => {
+  try { return localStorage.getItem(ROOM_KEY) } catch { return null }
+}
+export const setRoom = (r) => {
+  try { r ? localStorage.setItem(ROOM_KEY, r) : localStorage.removeItem(ROOM_KEY) } catch { /* sin almacenamiento */ }
+}
+
 // El servidor envía 1e9 en lugar de Infinity (JSON no admite infinitos).
 const revive = (_k, v) => (v === 1e9 ? Infinity : v)
 

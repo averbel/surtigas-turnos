@@ -151,12 +151,12 @@ export function effectiveStaff(office, moves, confirmedAbsences) {
 }
 
 // Evalúa escenarios de redistribución para una oficina con necesidad.
-export function buildRecommendation({ target, offices, staffOf, hour, params }) {
+export function buildRecommendation({ target, offices, staffOf, hour, params, exclude = [] }) {
   const t = offices.find((o) => o.id === target)
   const base = officeState(t, hour, staffOf(t), params)
 
   const candidates = offices
-    .filter((o) => o.id !== target && staffOf(o) >= 2)
+    .filter((o) => o.id !== target && !exclude.includes(o.id) && staffOf(o) >= 2)
     .map((o) => {
       const before = officeState(o, hour, staffOf(o), params)
       const after = officeState(o, hour, staffOf(o) - 1, params)

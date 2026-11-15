@@ -188,11 +188,20 @@ export function AppProvider({ children }) {
         toast('Redistribución aplicada', 'El sistema monitorea si la situación mejora.', 'ok')
       } else {
         setRec((r) => ({ ...r, status: 'rechazada' }))
-        addLog('Encargada', 'Rechazó la recomendación. El sistema sigue monitoreando y puede generar otra.', 'warn')
+        addLog('Encargada', 'Rechazó la recomendación. Puedes pedir otra alternativa al motor.', 'warn')
       }
     },
     [rec, addLog, toast]
   )
+
+  const reanalyze = useCallback(() => {
+    if (!rec || rec.status !== 'rechazada') return
+    const exclude = [...(rec.excluded || []), rec.donor].filter(Boolean)
+    const staffAfter = (o) => effectiveStaff(o, moves, absences)
+    const r = buildRecommendation({ target: rec.target, offices: OFFICES, staffOf: staffAfter, hour: minutesRef.current / 60, params, exclude })
+    setRec({ ...r, status: 'pendiente', id: Date.now(), createdAt: minutesRef.current, excluded: exclude })
+    addLog('Motor', r.donor ? 'Nueva recomendación generada descartando las alternativas rechazadas.' : 'No quedan oficinas con holgura para prestar personal, una vez descartadas las alternativas rechazadas.', r.donor ? null : 'warn')
+  }, [rec, moves, absences, params, addLog])
 
   const setDay = useCallback((d) => setParams((p) => ({ ...p, dow: d })), [])
   const jumpTo = useCallback((min) => setMinutes(Math.min(Math.max(min, MIN_CLOCK), MAX_CLOCK)), [])
@@ -214,7 +223,7 @@ export function AppProvider({ children }) {
     params, setParams, setDay,
     offices, staffOf,
     caseState, startCase, registerAttendance, respondPresent, respondAbsent, markReassigned, confirmAbsence,
-    rec, decideRec,
+    rec, decideRec, reanalyze,
     moves, absences,
     log, toasts, toast,
     lauraIn,

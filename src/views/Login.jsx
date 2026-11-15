@@ -35,15 +35,15 @@ const ROLES = [
 ]
 
 export default function Login() {
-  const { setRole, login } = useApp()
-  const [form, setForm] = useState({ username: '', password: '' })
+  const { setRole, login, room: savedRoom, newRoom } = useApp()
+  const [form, setForm] = useState({ username: '', password: '', room: savedRoom || '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const DEMO = { encargado: 'marta.rios', colaborador: 'laura.mendoza', admin: 'luis.herrera' }
-  const enter = async (username, password) => {
+  const enter = async (username, password, roomCode) => {
     setBusy(true)
     setErr('')
-    try { await login(username, password) } catch (e) { setErr(e.message) } finally { setBusy(false) }
+    try { await login(username, password, roomCode) } catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
   return (
     <>
@@ -83,7 +83,7 @@ export default function Login() {
                   e.currentTarget.style.setProperty('--mx', `${e.clientX - b.left}px`)
                   e.currentTarget.style.setProperty('--my', `${e.clientY - b.top}px`)
                 }}
-                onClick={() => (login ? enter(DEMO[r.key], 'Surtigas2026!') : setRole(r.key))}
+                onClick={() => (login ? enter(DEMO[r.key], 'Surtigas2026!', form.room) : setRole(r.key))}
               >
                 <div className="shine" />
                 <div className="ico"><r.icon size={26} color="#fff" /></div>
@@ -102,7 +102,7 @@ export default function Login() {
           </div>
           {login && (
             <form className="card card-pad" style={{ marginTop: 22, maxWidth: 560, display: 'grid', gap: 12 }}
-              onSubmit={(e) => { e.preventDefault(); enter(form.username, form.password) }}>
+              onSubmit={(e) => { e.preventDefault(); enter(form.username, form.password, form.room) }}>
               <div className="eyebrow">Iniciar sesión con otra cuenta</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <input id="login-user" aria-label="Usuario" placeholder="usuario" autoComplete="username" value={form.username}
@@ -112,12 +112,19 @@ export default function Login() {
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: '#fff' }} />
               </div>
+              <div className="row" style={{ gap: 10 }}>
+                <input id="login-room" aria-label="Código de sala" placeholder="código de sala (opcional)" maxLength={8} value={form.room}
+                  onChange={(e) => setForm({ ...form, room: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: '#fff', flex: 1 }} />
+                <button type="button" className="btn" onClick={() => { newRoom(); setForm({ ...form, room: '' }) }}>Sala nueva</button>
+              </div>
               <div className="row" style={{ gap: 12 }}>
                 <button className="btn btn-flame" type="submit" disabled={busy || !form.username || !form.password}>Entrar</button>
                 {err && <span className="chip crit" role="alert">{err}</span>}
               </div>
               <div className="faint" style={{ fontSize: 12, lineHeight: 1.5 }}>
-                Cuentas de demostración: marta.rios (encargado), laura.mendoza (colaborador), luis.herrera (administrador). Contraseña: Surtigas2026!
+                Cuentas de demostración: marta.rios (encargado), laura.mendoza (colaborador), luis.herrera (administrador). Contraseña: Surtigas2026!<br />
+                Cada navegador trabaja en su propia sala; para ver la misma demo en otro dispositivo, escribe el mismo código de sala.
               </div>
             </form>
           )}

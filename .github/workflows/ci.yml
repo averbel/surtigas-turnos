@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Compilar la web
+        run: npm run build
+      - name: Levantar el servidor
+        run: |
+          PORT=3001 DATA_DIR=$RUNNER_TEMP/data node server/index.js &
+          for i in $(seq 1 20); do curl -sf http://localhost:3001/api/health && break || sleep 1; done
+      - name: Pruebas de la API (42 pruebas de extremo a extremo)
+        run: npm run test:api
