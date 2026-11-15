@@ -76,7 +76,7 @@ El volumen `surtigas-datos` conserva la base y el secreto entre reinicios del co
 
 Pasos:
 
-1. En Render, «New» y «Blueprint», y selecciona el repositorio (privado; autoriza el acceso de Render a GitHub).
+1. En Render, «New» y «Blueprint», y selecciona el repositorio (si es privado, autoriza el acceso de Render a GitHub).
 2. Render lee `render.yaml`, compila y arranca.
 3. Abre la URL asignada y comprueba `/api/health`.
 

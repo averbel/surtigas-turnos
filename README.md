@@ -35,7 +35,7 @@ Este repositorio no incluye capturas de pantalla; el mockup en Figma y la demo e
 
 | Recurso | URL |
 |---|---|
-| Repositorio (privado) | https://github.com/averbel/surtigas-turnos |
+| Repositorio | https://github.com/averbel/surtigas-turnos |
 | Demo completa (web + API + SQLite) | https://surtigas-turnos.onrender.com |
 | Sitio estático (modo local, sin servidor) | https://surtigas-turnos.vercel.app |
 | Mockup en Figma (10 frames) | https://www.figma.com/design/lZ6STmDPY0DLdX1hnhuqVd |
