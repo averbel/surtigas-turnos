@@ -99,13 +99,16 @@ node server/test-api.mjs https://surtigas-turnos.onrender.com   # contra otra UR
 | Reglas laborales | 42 | con tope de 36 h no se puede aprobar | 409 con 38 incumplimientos |
 | | 43 | con 42 h vuelve a poder aprobarse | 200 |
 | Aislamiento de la malla | 44 | la malla de otra sala no cambió | `approved` nulo en la sala B |
-| Ramas del colaborador | 45 | confirma presencia | `resuelto`, `lauraIn` verdadero |
+| Privacidad (Ley 1581) | 45 | otro colaborador no ve la incapacidad de Laura | Sin ausencias ni líneas de incapacidad en su respuesta |
+| | 46 | Laura sí ve su propia ausencia | Una ausencia, la suya |
+| | 47 | el encargado ve todas las ausencias y el registro completo | La trazabilidad contiene la incapacidad |
+| Ramas del colaborador | 48 | confirma presencia | `resuelto`, `lauraIn` verdadero |
 | | 49 | «No podré asistir» escala al encargado | `escalado`, nivel 3 |
 | | 50 | el encargado marca un cambio autorizado | `resuelto`, sin ausencias |
-| Asistencia y corrección | 48 | registro de ingreso | 200 |
+| Asistencia y corrección | 51 | registro de ingreso | 200 |
 | | 52 | corrección vacía | 400 |
 | | 53 | solicitud de corrección | 201 |
-| Administración | 51 | admin actualiza parámetros | 200 y `waitWarn` = 30 |
+| Administración | 54 | admin actualiza parámetros | 200 y `waitWarn` = 30 |
 | | 55 | los parámetros no afectan a otra sala | `waitWarn` de B = 45 |
 | | 56 | admin completa gobernanza | 200 y las 4 condiciones verdaderas |
 | | 57 | admin lista usuarios | 200 y al menos 3 usuarios |
