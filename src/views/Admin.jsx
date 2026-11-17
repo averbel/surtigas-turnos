@@ -113,6 +113,7 @@ export function Params() {
         <F k="waitOk" label="Umbral «óptima»" min={5} max={40} unit="min" help="Espera máxima en el pico previsto para clasificar una oficina en verde." />
         <F k="waitWarn" label="Umbral «crítica»" min={20} max={90} step={5} unit="min" help="Por encima de este valor la oficina pasa a rojo. Referencia histórica: espera media 37 min." />
         <F k="muScale" label="Rendimiento de atención" min={0.7} max={1.3} step={0.05} unit="×" help="Escala la tasa de servicio histórica de cada oficina (1.0 = tiempos de mayo 2026)." />
+        <F k="maxWeeklyHours" label="Tope de horas semanales" min={30} max={60} unit="h" help="Regla laboral de la malla: no se puede aprobar si un colaborador la supera. Debe definirla Talento Humano." />
         <F k="maxKm" label="Radio máximo de traslado presencial" min={10} max={250} step={10} unit="km" help="Más allá de esta distancia el motor prioriza apoyo virtual." />
         <button className="btn" style={{ justifySelf: 'start' }} onClick={() => setParams({ ...DEFAULT_PARAMS, dow: params.dow })}>Restablecer valores</button>
       </div>

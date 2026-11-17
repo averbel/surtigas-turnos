@@ -8,6 +8,7 @@ services:
     plan: free
     buildCommand: npm install --include=dev && npm run build
     startCommand: node server/index.js
+    autoDeploy: true
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION

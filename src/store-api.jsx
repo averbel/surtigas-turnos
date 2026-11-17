@@ -5,13 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ctx } from './store'
 import { api, getRoom, getToken, setRoom, setToken } from './api'
 import { OFFICES, DEFAULT_PARAMS, effectiveStaff, officeState, staffDeficit, statusFromWait } from './engine'
+import { generateMalla } from './malla'
 
 const DEMO_MIN = 13 * 60 + 5
 const DEMO_DOW = 4
 const MIN_CLOCK = 7 * 60 + 30
 const MAX_CLOCK = 16 * 60 + 30
 const PERSON = { name: 'Laura Mendoza', office: 'tur' }
-const EMPTY = { params: {}, governance: { th: false, legal: false, ley: false, comm: false }, caseState: null, rec: null, moves: [], absences: [], lauraIn: false, log: [] }
+const EMPTY = { malla: { absences: [], rotation: true, version: 1, approved: null }, params: {}, governance: { th: false, legal: false, ley: false, comm: false }, caseState: null, rec: null, moves: [], absences: [], lauraIn: false, log: [] }
 
 const STAGE_TOAST = {
   no_registrado: ['Persona no registrada', 'Etiqueta neutra. Se verifica antes de concluir nada.', 'warn'],
@@ -65,9 +66,17 @@ export function ApiProvider({ children }) {
     }))
   }, [])
 
+  // Cada petición lleva un número; una respuesta más antigua que la ya aplicada se descarta,
+  // para que una consulta periódica lenta no pise el resultado de una acción reciente.
+  const seq = useRef(0)
+  const applied = useRef(0)
   const refresh = useCallback(async () => {
+    const my = ++seq.current
     try {
-      applyState(await api.get('/api/state'))
+      const s = await api.get('/api/state')
+      if (my < applied.current) return
+      applied.current = my
+      applyState(s)
     } catch (e) {
       if (e.status === 401) logout()
     }
@@ -113,6 +122,12 @@ export function ApiProvider({ children }) {
 
   const params = useMemo(() => ({ ...DEFAULT_PARAMS, ...srv.params, dow }), [srv.params, dow])
   const hour = minutes / 60
+  const malla = srv.malla
+  const mallaSig = JSON.stringify([params.waitOk, params.waitWarn, params.maxKm, params.muScale, params.maxWeeklyHours])
+  const mallaData = useMemo(
+    () => generateMalla({ absences: malla.absences, params, rotation: malla.rotation, maxWeeklyHours: params.maxWeeklyHours ?? 42 }),
+    [malla.absences, malla.rotation, mallaSig] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const staffOf = useCallback((o) => effectiveStaff(o, srv.moves, srv.absences), [srv.moves, srv.absences])
   const caseState = srv.caseState
 
@@ -143,12 +158,16 @@ export function ApiProvider({ children }) {
   // Ejecuta una acción en el servidor y adopta el estado que devuelve.
   const act = useCallback(async (fn) => {
     try {
+      const my = ++seq.current
       const s = await fn()
-      if (s && s.log) applyState(s)
+      if (s && s.log && my >= applied.current) {
+        applied.current = my
+        applyState(s)
+      }
       return s
     } catch (e) {
       if (e.status === 401) logout()
-      else toast('No se pudo completar la acción', e.message, 'warn')
+      else toast(e.status === 409 ? 'No se puede realizar ahora' : 'No se pudo completar la acción', e.message, 'warn')
       return null
     }
   }, [applyState, logout, toast])
@@ -167,7 +186,7 @@ export function ApiProvider({ children }) {
     setDow(DEMO_DOW)
     setMinutes(DEMO_MIN)
     minutesRef.current = DEMO_MIN
-    return act(() => api.post('/api/demo/trigger', { simMin: DEMO_MIN }))
+    return act(() => api.post('/api/demo/trigger', { simMin: DEMO_MIN, dow: DEMO_DOW }))
   }, [act])
   const reset = useCallback(() => {
     setDow(DEMO_DOW)
@@ -175,6 +194,12 @@ export function ApiProvider({ children }) {
     return act(() => api.post('/api/demo/reset'))
   }, [act])
   const reanalyze = useCallback(() => act(() => api.post('/api/recommendations/reanalyze', { simMin: minutesRef.current, dow: dowRef.current })), [act])
+  const setMallaAbsence = useCallback((op, dow, absent, kind) => act(() => api.put('/api/malla/absences', { op, dow, absent, kind, simMin: minutesRef.current })), [act])
+  const setMallaRotation = useCallback((rotation) => act(() => api.put('/api/malla/settings', { rotation, simMin: minutesRef.current })), [act])
+  const approveMalla = useCallback(async () => {
+    const s = await act(() => api.post('/api/malla/approve', { simMin: minutesRef.current }))
+    if (s) toast('Malla aprobada', 'Versión publicada para los colaboradores.', 'ok')
+  }, [act, toast])
   const registerAttendance = useCallback(() => act(() => api.post('/api/attendance/checkin', { simMin: minutesRef.current })), [act])
   const respondPresent = useCallback(() => act(() => api.post('/api/cases/current/respond', { answer: 'present', simMin: minutesRef.current })), [act])
   const respondAbsent = useCallback(() => act(() => api.post('/api/cases/current/respond', { answer: 'absent', simMin: minutesRef.current })), [act])
@@ -241,6 +266,7 @@ export function ApiProvider({ children }) {
     lauraIn: srv.lauraIn,
     govDone: srv.governance, setGovDone,
     reset,
+    malla, mallaData, setMallaAbsence, setMallaRotation, approveMalla,
     sendCorrection,
     person: PERSON,
     api: {

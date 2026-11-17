@@ -10,6 +10,7 @@ import {
   statusFromWait,
   fmtHour,
 } from './engine'
+import { generateMalla, MALLA_DAYS, SHIFT_TYPES, shiftText, operatorByUsername, operatorById, ABSENCE_KINDS } from './malla'
 
 export const Ctx = createContext(null)
 export const useApp = () => useContext(Ctx)
@@ -41,6 +42,16 @@ export function AppProvider({ children }) {
   const [toasts, setToasts] = useState([])
   const [lauraIn, setLauraIn] = useState(false)
   const [govDone, setGovDone] = useState({ th: false, legal: false, ley: false, comm: false })
+  const [mallaState, setMallaState] = useState({ absences: [], rotation: true, version: 1, approved: null })
+  const mallaSig = JSON.stringify([params.waitOk, params.waitWarn, params.maxKm, params.muScale, params.maxWeeklyHours])
+  const mallaData = useMemo(
+    () => generateMalla({ absences: mallaState.absences, params, rotation: mallaState.rotation, maxWeeklyHours: params.maxWeeklyHours ?? 42 }),
+    [mallaState.absences, mallaState.rotation, mallaSig] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const malla = useMemo(
+    () => ({ ...mallaState, approved: mallaState.approved && { ...mallaState.approved, stale: mallaState.approved.version !== mallaState.version || mallaState.approved.sig !== mallaSig } }),
+    [mallaState, mallaSig]
+  )
   const idRef = useRef(10)
   const minutesRef = useRef(minutes)
   minutesRef.current = minutes
@@ -94,6 +105,12 @@ export function AppProvider({ children }) {
 
   // ---- Caso de verificación (4 niveles) ----
   const startCase = useCallback(() => {
+    const person = operatorByUsername('laura.mendoza')
+    const slot = mallaData.operators.find((o) => o.id === person.id)?.week.find((d) => d.dow === DEMO_DOW)
+    if (slot?.shift === 'AUS') {
+      toast('No es un caso «no registrado»', `${PERSON.name} tiene una ${(ABSENCE_KINDS[slot.kind] || 'ausencia').toLowerCase()} programada hoy en la malla (Nivel 0).`, 'warn')
+      return
+    }
     setLauraIn(false)
     setRec(null)
     setMoves([])
@@ -101,10 +118,11 @@ export function AppProvider({ children }) {
     setParams((p) => ({ ...p, dow: DEMO_DOW }))
     setMinutes(DEMO_MIN)
     minutesRef.current = DEMO_MIN
+    addLog('Sistema', `Nivel 0 · Malla v${mallaState.version} sincronizada: ${PERSON.name} figura en ${SHIFT_TYPES[slot.shift].label} (${shiftText(slot.shift)}) en ${officeById(slot.office).name}.`)
     setCase({ id: Date.now(), person: PERSON.name, office: PERSON.office, level: 1, stage: 'no_registrado', since: DEMO_MIN })
     addLog('Sistema', `Nivel 1 · ${PERSON.name} aparece como «no registrado» en ${officeById(PERSON.office).name}. No se declara ausencia.`, 'warn')
     toast('Persona no registrada', `${officeById(PERSON.office).name} · etiqueta neutra. Se verifica antes de concluir nada.`, 'warn')
-  }, [addLog, toast])
+  }, [addLog, toast, mallaData, mallaState.version])
 
   // Avance automático Nivel 1 → 2 → 3 (a menos que el colaborador responda).
   useEffect(() => {
@@ -203,6 +221,25 @@ export function AppProvider({ children }) {
     addLog('Motor', r.donor ? 'Nueva recomendación generada descartando las alternativas rechazadas.' : 'No quedan oficinas con holgura para prestar personal, una vez descartadas las alternativas rechazadas.', r.donor ? null : 'warn')
   }, [rec, moves, absences, params, addLog])
 
+  const setMallaAbsence = useCallback((opId, dow, absent, kind = 'permiso') => {
+    const op = operatorById(opId)
+    setMallaState((m) => ({ ...m, absences: [...m.absences.filter((a) => !(a.op === opId && a.dow === dow)), ...(absent ? [{ op: opId, dow, kind }] : [])], version: m.version + 1 }))
+    addLog('Encargada', absent ? `Registró ${ABSENCE_KINDS[kind].toLowerCase()} de ${op.name} el ${MALLA_DAYS[dow].toLowerCase()}; la malla se recalculó.` : `Quitó la ausencia programada de ${op.name} el ${MALLA_DAYS[dow].toLowerCase()}.`, absent ? 'warn' : null)
+  }, [addLog])
+  const setMallaRotation = useCallback((rotation) => {
+    setMallaState((m) => ({ ...m, rotation, version: m.version + 1 }))
+    addLog('Encargada', `${rotation ? 'Activó' : 'Desactivó'} la rotación del personal flexible entre oficinas; la malla se recalculó.`)
+  }, [addLog])
+  const approveMalla = useCallback(() => {
+    if (mallaData.summary.hardViolations > 0) {
+      toast('No se puede aprobar la malla', `Hay ${mallaData.summary.hardViolations} incumplimiento(s) de reglas laborales (tope de ${mallaData.maxWeeklyHours} h semanales).`, 'warn')
+      return
+    }
+    setMallaState((m) => ({ ...m, approved: { version: m.version, at: Date.now(), by: 'Marta Ríos', sig: mallaSig } }))
+    addLog('Encargada', `Aprobó la malla de turnos (versión ${mallaState.version}): cobertura ${mallaData.summary.coveragePct} %.`, 'ok')
+    toast('Malla aprobada', `Versión ${mallaState.version} publicada para los colaboradores.`, 'ok')
+  }, [mallaData, mallaState.version, mallaSig, addLog, toast])
+
   const setDay = useCallback((d) => setParams((p) => ({ ...p, dow: d })), [])
   const jumpTo = useCallback((min) => setMinutes(Math.min(Math.max(min, MIN_CLOCK), MAX_CLOCK)), [])
 
@@ -212,6 +249,7 @@ export function AppProvider({ children }) {
     setMoves([])
     setAbsences([])
     setLauraIn(false)
+    setMallaState({ absences: [], rotation: true, version: 1, approved: null })
     setParams((p) => ({ ...p, dow: DEMO_DOW }))
     setMinutes(DEMO_MIN)
     setLog([{ id: ++idRef.current, t: '13:00', actor: 'Sistema', text: 'Malla de turnos aprobada sincronizada (Nivel 0).' }])
@@ -229,6 +267,7 @@ export function AppProvider({ children }) {
     lauraIn,
     govDone, setGovDone,
     reset,
+    malla, mallaData, setMallaAbsence, setMallaRotation, approveMalla,
     mode: 'local', login: null, api: null, user: null,
     sendCorrection: async () => { toast('Solicitud enviada', 'Talento Humano revisará la corrección de tu dato.', 'ok'); return true },
     person: PERSON,

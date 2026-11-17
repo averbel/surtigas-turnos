@@ -13,7 +13,7 @@ const CLOSE = 17
 
 // Umbrales (min) de referencia: la espera media histórica es 37 min y el 40 % de los
 // usuarios espera más de 30 min. Son configurables por el administrador.
-export const DEFAULT_PARAMS = { waitOk: 20, waitWarn: 45, maxKm: 60, dow: 4, muScale: 1 }
+export const DEFAULT_PARAMS = { waitOk: 20, waitWarn: 45, maxKm: 60, dow: 4, muScale: 1, maxWeeklyHours: 42 }
 export const DOW_LABEL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
 const binOf = (h) => Math.min(Math.max(Math.floor(h) - HOUR0, 0), HIST.horas.length - 1)

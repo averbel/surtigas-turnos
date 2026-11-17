@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
-  AlertTriangle, ArrowRight, Bell, CheckCircle2, ClipboardList, Clock3, Database, Gauge, History, Lightbulb,
+  AlertTriangle, ArrowRight, Bell, CheckCircle2, ClipboardList, CalendarRange, Clock3, Database, Gauge, History, Lightbulb,
   MailQuestion, ScanFace, ShieldCheck, Sparkles, Users, X, XCircle, Timer, FlaskConical, ArrowLeftRight, UserPlus,
 } from 'lucide-react'
 import { useApp } from '../store'
 import { CountUp, Sidebar, StatusChip, Topbar } from '../components/ui'
 import { DemandChart, WaitBars, WaitChart } from '../components/charts'
+import Malla from './Malla'
+import { SHIFT_TYPES, operatorByUsername, shiftText } from '../malla'
 import { DOW_LABEL, HIST, OFFICES, STATUS_LABEL, fmtHour, fmtWait, muOf, officeById } from '../engine'
 
 const officeName = (id) => officeById(id)?.name
@@ -20,6 +22,7 @@ export default function Manager() {
 
   const items = [
     { key: 'dash', label: 'Centro de decisión', icon: Gauge },
+    { key: 'malla', label: 'Malla de turnos', icon: CalendarRange },
     { key: 'verif', label: 'Verificación', icon: ScanFace, badge: pendingCase },
     { key: 'rec', label: 'Recomendaciones', icon: Lightbulb, badge: pendingRec },
     { key: 'hist', label: 'Histórico', icon: Database },
@@ -27,6 +30,7 @@ export default function Manager() {
   ]
   const titles = {
     dash: ['Estado de la operación', `${DOW_LABEL[params.dow]} · 14 oficinas · ${total} operadores en turno`],
+    malla: ['Malla de turnos', 'Semana tipo · lunes a viernes'],
     verif: ['Verificación de asistencia', 'Proceso de 4 niveles'],
     rec: ['Recomendaciones del motor', 'Simulación · teoría de colas'],
     hist: ['Histórico de Digiturno', 'Mayo 2026 · base del modelo'],
@@ -40,6 +44,7 @@ export default function Manager() {
         <Topbar title={titles[view][0]} subtitle={titles[view][1]} userName={user?.name ?? 'Marta Ríos'} roleLabel="Encargado de turnos" />
         <motion.div key={view} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
             {view === 'dash' && <Dashboard goto={setView} />}
+            {view === 'malla' && <Malla />}
             {view === 'verif' && <Verification />}
             {view === 'rec' && <Recommendations />}
             {view === 'hist' && <Historic />}
@@ -298,7 +303,7 @@ const STEPS = [
 ]
 
 export function Verification() {
-  const { caseState, confirmAbsence, markReassigned, startCase } = useApp()
+  const { caseState, confirmAbsence, markReassigned, startCase, malla, mallaData } = useApp()
   if (!caseState)
     return (
       <div className="card card-pad" style={{ textAlign: 'center', padding: 50 }}>
@@ -311,6 +316,8 @@ export function Verification() {
       </div>
     )
 
+  const person = operatorByUsername('laura.mendoza')
+  const slot = mallaData.operators.find((o) => o.id === person.id)?.week.find((d) => d.dow === 4)
   const resolved = caseState.stage === 'resuelto'
   const confirmed = caseState.stage === 'ausencia_confirmada'
   const activeLevel = resolved || confirmed ? 4 : caseState.level
@@ -334,6 +341,11 @@ export function Verification() {
           <span className="sp" />
           <StatusChip status={stateLabel[0]}>{stateLabel[1]}</StatusChip>
         </div>
+        {slot && slot.shift !== 'AUS' && (
+          <div className="chip info" style={{ marginBottom: 18, whiteSpace: 'normal' }}>
+            Nivel 0 · Malla v{malla.version}{malla.approved && !malla.approved.stale ? ' aprobada' : ' en borrador'}: figura en {SHIFT_TYPES[slot.shift].label} ({shiftText(slot.shift)}) en {officeName(slot.office)}
+          </div>
+        )}
 
         <div className="stepper">
           {STEPS.map((s, i) => {

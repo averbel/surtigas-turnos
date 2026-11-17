@@ -347,3 +347,28 @@ table.t td { padding: 11px 10px; border-top: 1px solid var(--line); }
 input[type=range]::-webkit-slider-thumb { background: var(--orange); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--orange); }
 .avatar { color: #fff; }
 .clock, .user-pill { background: #fff; }
+
+/* ───────── Malla de turnos ───────── */
+.select { padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--text); font-weight: 600; font-size: 13.5px; min-width: 220px; max-width: 100%; }
+.select:focus-visible, .mg-cell:focus-visible, .mg-menu button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.malla-t td, .malla-t th { white-space: nowrap; }
+.malla-t td { padding: 7px 8px; }
+.mg-cell { width: 100%; text-align: left; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; }
+.mg-cell:hover { background: #f1f5f9; border-color: var(--line); }
+.mg-shift { display: grid; line-height: 1.25; }
+.mg-shift b { font-size: 12.5px; }
+.mg-shift small { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.mg-shift em { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--orange); text-transform: uppercase; letter-spacing: .06em; }
+.mg-chip { font-size: 11px; padding: 3px 8px; }
+.mg-backdrop { position: fixed; inset: 0; z-index: 40; }
+.mg-menu { position: absolute; z-index: 41; top: 100%; left: 8px; min-width: 190px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16); padding: 4px; display: grid; }
+.mg-menu button { text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+.mg-menu button:hover { background: #f1f5f9; }
+table.t tr.sel td { background: rgba(232, 89, 12, 0.07); }
+table.heat { width: 100%; border-collapse: separate; border-spacing: 4px; table-layout: fixed; min-width: 520px; }
+table.heat th { font-size: 11px; font-weight: 600; color: var(--faint); text-align: center; padding-bottom: 2px; }
+table.heat td { text-align: center; padding: 10px 2px; border-radius: 8px; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.h-ok { background: rgba(22, 163, 74, 0.14); color: #166534; }
+.h-warn { background: rgba(217, 119, 6, 0.16); color: #92400e; }
+.h-crit { background: rgba(220, 38, 38, 0.14); color: #991b1b; }
+.h-none { background: #f1f5f9; color: var(--faint); }

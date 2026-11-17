@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { OFFICES, DEFAULT_PARAMS, buildRecommendation, effectiveStaff, officeById, fmtHour } from '../src/engine.js'
+import { generateMalla, operatorById, operatorByUsername, MALLA_DAYS, MALLA_DEFAULTS, ABSENCE_KINDS, SHIFT_TYPES, shiftText } from '../src/malla.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
@@ -96,7 +97,8 @@ function ensureRoom(room) {
   if (db.prepare('SELECT 1 FROM rooms WHERE code = ?').get(room)) return
   db.prepare('INSERT INTO rooms (code, created_at, last_seen) VALUES (?, ?, ?)').run(room, now, now)
   kvSet(room, 'governance', { th: false, legal: false, ley: false, comm: false })
-  kvSet(room, 'params', { waitOk: DEFAULT_PARAMS.waitOk, waitWarn: DEFAULT_PARAMS.waitWarn, maxKm: DEFAULT_PARAMS.maxKm, muScale: DEFAULT_PARAMS.muScale })
+  kvSet(room, 'params', { waitOk: DEFAULT_PARAMS.waitOk, waitWarn: DEFAULT_PARAMS.waitWarn, maxKm: DEFAULT_PARAMS.maxKm, muScale: DEFAULT_PARAMS.muScale, maxWeeklyHours: MALLA_DEFAULTS.maxWeeklyHours })
+  kvSet(room, 'malla', { absences: [], rotation: MALLA_DEFAULTS.rotation, version: 1, approved: null })
   kvSet(room, 'lauraIn', false)
   kvSet(room, 'inactive', [])
   audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13)
@@ -203,6 +205,24 @@ function getParams(room, extra = {}) {
 const getMoves = (room) => db.prepare('SELECT from_office AS "from", to_office AS "to", at_min AS at FROM moves WHERE room = ?').all(room)
 const getAbsences = (room) => db.prepare('SELECT office_id FROM absences WHERE room = ?').all(room).map((r) => r.office_id)
 
+// Malla de la sala: ausencias programadas, rotación y aprobación (versión del encargado).
+const getMalla = (room) => ({ absences: [], rotation: true, version: 1, approved: null, ...kvGet(room, 'malla', {}) })
+const computeMalla = (room, m = getMalla(room)) => {
+  const params = getParams(room)
+  return generateMalla({ absences: m.absences, params, rotation: m.rotation, maxWeeklyHours: params.maxWeeklyHours ?? MALLA_DEFAULTS.maxWeeklyHours })
+}
+// Un cambio posterior a la aprobación obliga a aprobar de nuevo.
+function invalidateApproval(room) {
+  const m = getMalla(room)
+  m.version += 1
+  kvSet(room, 'malla', m)
+  return m
+}
+const mallaView = (room) => {
+  const m = getMalla(room)
+  return { absences: m.absences, rotation: m.rotation, version: m.version, approved: m.approved && { ...m.approved, stale: m.approved.version !== m.version } }
+}
+
 function fullState(room) {
   const c = advanceCase(room, currentCase(room))
   const rec = c ? db.prepare('SELECT * FROM recs WHERE case_id = ? ORDER BY id DESC LIMIT 1').get(c.id) : null
@@ -210,6 +230,7 @@ function fullState(room) {
     room,
     params: kvGet(room, 'params', {}),
     governance: kvGet(room, 'governance'),
+    malla: mallaView(room),
     caseState: caseView(c),
     rec: recView(rec),
     moves: getMoves(room),
@@ -269,9 +290,11 @@ app.put('/api/params', auth('admin'), (req, res) => {
     waitWarn: Math.min(180, Math.max(5, num(b.waitWarn, DEFAULT_PARAMS.waitWarn))),
     maxKm: Math.min(500, Math.max(1, num(b.maxKm, DEFAULT_PARAMS.maxKm))),
     muScale: Math.min(2, Math.max(0.3, num(b.muScale, 1))),
+    maxWeeklyHours: Math.min(60, Math.max(30, num(b.maxWeeklyHours, MALLA_DEFAULTS.maxWeeklyHours))),
   }
   kvSet(req.room, 'params', next)
-  audit(req.room, 'Administrador', `Actualizó parámetros del motor (umbrales ${next.waitOk}/${next.waitWarn} min, radio ${next.maxKm} km, rendimiento ×${next.muScale}).`, null)
+  audit(req.room, 'Administrador', `Actualizó parámetros del motor (umbrales ${next.waitOk}/${next.waitWarn} min, radio ${next.maxKm} km, rendimiento ×${next.muScale}, tope ${next.maxWeeklyHours} h semanales).`, null)
+  invalidateApproval(req.room)
   res.json({ params: next })
 })
 app.put('/api/governance', auth('admin'), (req, res) => {
@@ -324,10 +347,19 @@ app.post('/api/corrections', auth('colaborador'), (req, res) => {
 app.post('/api/demo/trigger', auth(), (req, res) => {
   const room = req.room
   const simMin = num(req.body?.simMin, 13 * 60 + 5)
+  const dow = Math.min(4, Math.max(0, num(req.body?.dow, 4)))
+  // Nivel 0: se contrasta con la malla antes de etiquetar a nadie como «no registrado».
+  const person = operatorByUsername(DEMO_PERSON.username)
+  const mState = getMalla(room)
+  const slot = computeMalla(room, mState).operators.find((o) => o.id === person.id)?.week.find((d) => d.dow === dow)
+  if (slot?.shift === 'AUS') {
+    return res.status(409).json({ error: `${DEMO_PERSON.name} tiene una ${(ABSENCE_KINDS[slot.kind] || 'ausencia').toLowerCase()} programada el ${MALLA_DAYS[dow].toLowerCase()} en la malla (Nivel 0). No es un caso «no registrado».` })
+  }
   kvSet(room, 'simMin', simMin)
   kvSet(room, 'lauraIn', false)
   for (const t of ['recs', 'moves', 'absences']) db.prepare(`DELETE FROM ${t} WHERE room = ?`).run(room)
   db.prepare("INSERT INTO cases (room, person, office_id, stage, level, created_at) VALUES (?, ?, ?, 'no_registrado', 1, ?)").run(room, DEMO_PERSON.name, DEMO_PERSON.office, Date.now())
+  audit(room, 'Sistema', `Nivel 0 · Malla v${mState.version} sincronizada: ${DEMO_PERSON.name} figura en ${SHIFT_TYPES[slot.shift].label} (${shiftText(slot.shift)}) en ${officeById(slot.office).name}.`, null, simMin)
   audit(room, 'Sistema', `Nivel 1 · ${DEMO_PERSON.name} aparece como «no registrado» en ${officeById(DEMO_PERSON.office).name}. No se declara ausencia.`, 'warn', simMin)
   res.json(fullState(room))
 })
@@ -335,6 +367,7 @@ app.post('/api/demo/reset', auth(), (req, res) => {
   const room = req.room
   for (const t of ['recs', 'moves', 'absences', 'cases', 'audit']) db.prepare(`DELETE FROM ${t} WHERE room = ?`).run(room)
   kvSet(room, 'lauraIn', false)
+  kvSet(room, 'malla', { absences: [], rotation: MALLA_DEFAULTS.rotation, version: 1, approved: null })
   audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13)
   res.json(fullState(room))
 })
@@ -410,6 +443,49 @@ app.post('/api/recommendations/:id/decision', auth('encargado'), (req, res) => {
     db.prepare("UPDATE recs SET status='rechazada' WHERE id=?").run(r.id)
     audit(room, 'Encargada', 'Rechazó la recomendación. Puedes pedir otra alternativa al motor.', 'warn', simMin)
   }
+  res.json(fullState(room))
+})
+
+// Malla de turnos (encargado): ausencias programadas, rotación y aprobación.
+app.get('/api/malla', auth(), (req, res) => {
+  const m = computeMalla(req.room)
+  res.json({ ...mallaView(req.room), summary: m.summary, violations: m.violations })
+})
+app.put('/api/malla/absences', auth('encargado'), (req, res) => {
+  const room = req.room
+  const op = operatorById(String(req.body?.op || ''))
+  const dow = Number(req.body?.dow)
+  if (!op) return res.status(404).json({ error: 'Colaborador no encontrado en la plantilla.' })
+  if (!Number.isInteger(dow) || dow < 0 || dow > 4) return res.status(400).json({ error: 'El día debe estar entre lunes y viernes.' })
+  const absent = !!req.body?.absent
+  const kind = Object.keys(ABSENCE_KINDS).includes(req.body?.kind) ? req.body.kind : 'permiso'
+  const m = getMalla(room)
+  m.absences = m.absences.filter((a) => !(a.op === op.id && a.dow === dow))
+  if (absent) m.absences.push({ op: op.id, dow, kind })
+  m.version += 1
+  kvSet(room, 'malla', m)
+  audit(room, 'Encargada', absent ? `Registró ${ABSENCE_KINDS[kind].toLowerCase()} de ${op.name} el ${MALLA_DAYS[dow].toLowerCase()}; la malla se recalculó.` : `Quitó la ausencia programada de ${op.name} el ${MALLA_DAYS[dow].toLowerCase()}.`, absent ? 'warn' : null, num(req.body?.simMin, null))
+  res.json(fullState(room))
+})
+app.put('/api/malla/settings', auth('encargado'), (req, res) => {
+  const room = req.room
+  const m = getMalla(room)
+  m.rotation = !!req.body?.rotation
+  m.version += 1
+  kvSet(room, 'malla', m)
+  audit(room, 'Encargada', `${m.rotation ? 'Activó' : 'Desactivó'} la rotación del personal flexible entre oficinas; la malla se recalculó.`, null, num(req.body?.simMin, null))
+  res.json(fullState(room))
+})
+app.post('/api/malla/approve', auth('encargado'), (req, res) => {
+  const room = req.room
+  const m = getMalla(room)
+  const calc = computeMalla(room, m)
+  if (calc.summary.hardViolations > 0) {
+    return res.status(409).json({ error: `No se puede aprobar: hay ${calc.summary.hardViolations} incumplimiento(s) de reglas laborales (por ejemplo, el tope de ${calc.maxWeeklyHours} h semanales).`, violations: calc.violations.filter((v) => v.level === 'crit') })
+  }
+  m.approved = { version: m.version, at: Date.now(), by: req.user.name }
+  kvSet(room, 'malla', m)
+  audit(room, 'Encargada', `Aprobó la malla de turnos (versión ${m.version}): cobertura ${calc.summary.coveragePct} %, ${calc.violations.filter((v) => v.level === 'warn').length} advertencia(s) de cobertura.`, 'ok', num(req.body?.simMin, null))
   res.json(fullState(room))
 })
 

@@ -17,9 +17,11 @@ jobs:
       - run: npm ci
       - name: Compilar la web
         run: npm run build
+      - name: Pruebas unitarias del motor de malla
+        run: npm run test:malla
       - name: Levantar el servidor
         run: |
           PORT=3001 DATA_DIR=$RUNNER_TEMP/data node server/index.js &
           for i in $(seq 1 20); do curl -sf http://localhost:3001/api/health && break || sleep 1; done
-      - name: Pruebas de la API (42 pruebas de extremo a extremo)
+      - name: Pruebas de la API (extremo a extremo)
         run: npm run test:api

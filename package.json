@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "start": "vite build && node server/index.js",
-    "test:api": "node server/test-api.mjs"
+    "test:api": "node server/test-api.mjs",
+    "test:malla": "node --test server/malla.test.mjs",
+    "test": "node --test server/malla.test.mjs && node server/test-api.mjs",
+    "calibrar": "node scripts/calibrar-kappa.mjs"
   },
   "dependencies": {
     "express": "^5.3.0",

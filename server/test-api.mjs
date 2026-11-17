@@ -1,5 +1,6 @@
 // Prueba de extremo a extremo de la API. Uso: node server/test-api.mjs [http://localhost:3001]
 // Crea salas de prueba propias (TESTA1, TESTB2) y las deja limpias al terminar.
+import { operatorByUsername } from '../src/malla.js'
 const BASE = process.argv[2] || 'http://localhost:3001'
 const PW = process.env.DEMO_PASSWORD || 'Surtigas2026!'
 let fails = 0
@@ -77,6 +78,37 @@ ok('traslado aprobado y aplicado', st.rec.status === 'aprobada' && st.moves.leng
 ok('segunda decisión → 409', (await call('POST', `/api/recommendations/${st.rec.id}/decision`, { approve: false }, enc)).s === 409)
 ok('trazabilidad registra las acciones', st.log.length >= 7, `${st.log.length} entradas`)
 ok('la sala B sigue intacta tras operar en A', (await call('GET', '/api/state', null, encB)).j.moves.length === 0)
+
+// Malla de turnos: ausencias programadas, Nivel 0, aprobación y reglas laborales
+const ml = (await call('GET', '/api/malla', null, enc)).j
+ok('la malla se genera con cobertura y violaciones', ml.summary?.operators === 38 && ml.summary.coveragePct > 0 && Array.isArray(ml.violations), `cobertura ${ml.summary?.coveragePct} %, rotaciones ${ml.summary?.visitingShifts}`)
+ok('sin aprobar al inicio', ml.approved === null && ml.version >= 1)
+const opLaura = operatorByUsername('laura.mendoza').id
+ok('colaborador no puede registrar ausencias → 403', (await call('PUT', '/api/malla/absences', { op: opLaura, dow: 4, absent: true }, col)).s === 403)
+ok('colaborador no puede aprobar la malla → 403', (await call('POST', '/api/malla/approve', {}, col)).s === 403)
+ok('día fuera de rango → 400', (await call('PUT', '/api/malla/absences', { op: opLaura, dow: 7, absent: true }, enc)).s === 400)
+ok('colaborador desconocido → 404', (await call('PUT', '/api/malla/absences', { op: 'zz99', dow: 1, absent: true }, enc)).s === 404)
+let mst = (await call('PUT', '/api/malla/absences', { op: opLaura, dow: 4, absent: true, kind: 'incapacidad' }, enc)).j
+ok('el encargado registra una incapacidad', mst.malla.absences.length === 1 && mst.malla.absences[0].kind === 'incapacidad')
+const blocked = await call('POST', '/api/demo/trigger', { simMin: 785, dow: 4 }, enc)
+ok('Nivel 0: con incapacidad programada no hay caso «no registrado» → 409', blocked.s === 409 && /programada/.test(blocked.j.error))
+mst = (await call('PUT', '/api/malla/absences', { op: opLaura, dow: 4, absent: false }, enc)).j
+ok('al quitar la ausencia vuelve a poder crearse el caso', mst.malla.absences.length === 0)
+st = (await call('POST', '/api/demo/trigger', { simMin: 785, dow: 4 }, enc)).j
+ok('la trazabilidad cita la malla en el Nivel 0', st.log.some((l) => /Nivel 0 · Malla v\d+ sincronizada/.test(l.text) && /Laura Mendoza/.test(l.text)))
+const v0 = mst.malla.version
+mst = (await call('POST', '/api/malla/approve', {}, enc)).j
+ok('el encargado aprueba la malla', mst.malla.approved?.by === 'Marta Ríos' && mst.malla.approved.stale === false && mst.malla.approved.version === mst.malla.version)
+mst = (await call('PUT', '/api/malla/settings', { rotation: false }, enc)).j
+ok('cambiar la rotación recalcula y deja la aprobación vencida', mst.malla.rotation === false && mst.malla.approved.stale === true && mst.malla.version > v0)
+ok('la rotación desactivada elimina los turnos visitantes', (await call('GET', '/api/malla', null, enc)).j.summary.visitingShifts === 0)
+await call('PUT', '/api/malla/settings', { rotation: true }, enc)
+await call('PUT', '/api/params', { waitOk: 20, waitWarn: 45, maxKm: 60, muScale: 1, maxWeeklyHours: 36 }, adm)
+const strict = await call('POST', '/api/malla/approve', {}, enc)
+ok('con tope de 36 h no se puede aprobar (regla laboral dura) → 409', strict.s === 409 && strict.j.violations?.length === 38)
+await call('PUT', '/api/params', { waitOk: 20, waitWarn: 45, maxKm: 60, muScale: 1, maxWeeklyHours: 42 }, adm)
+ok('con 42 h vuelve a poder aprobarse', (await call('POST', '/api/malla/approve', {}, enc)).s === 200)
+ok('la malla de otra sala no cambió', (await call('GET', '/api/malla', null, encB)).j.approved === null)
 
 // Rama: el colaborador responde presente / no podrá asistir
 await call('POST', '/api/demo/trigger', { simMin: 785 }, enc)

@@ -1,0 +1,271 @@
+{
+ "nota": "Plantilla de personal FICTICIA para la demostración; sustituir por la nómina real de Surtigas.",
+ "operators": [
+  {
+   "id": "op01",
+   "name": "Jorge Pineda",
+   "home": "ctg",
+   "flex": false,
+   "username": "jorge.pineda"
+  },
+  {
+   "id": "op02",
+   "name": "Carlos Cuello",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op03",
+   "name": "María Fuentes",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op04",
+   "name": "Luis Támara",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op05",
+   "name": "Diana Mercado",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op06",
+   "name": "Andrés Navarro",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op07",
+   "name": "Paola Rangel",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op08",
+   "name": "Camilo Ruiz",
+   "home": "ctg",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op09",
+   "name": "Sandra Tapia",
+   "home": "ctg",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op10",
+   "name": "Javier Villalba",
+   "home": "ctg",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op11",
+   "name": "Marcela Ospina",
+   "home": "ctg",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op12",
+   "name": "Ana Támara",
+   "home": "mon",
+   "flex": false,
+   "username": "ana.tamara"
+  },
+  {
+   "id": "op13",
+   "name": "Hernán Jiménez",
+   "home": "mon",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op14",
+   "name": "Yurany Acosta",
+   "home": "mon",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op15",
+   "name": "Felipe Lara",
+   "home": "mon",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op16",
+   "name": "Claudia Gómez",
+   "home": "mon",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op17",
+   "name": "Rafael Herrera",
+   "home": "mon",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op18",
+   "name": "Liliana Polo",
+   "home": "sin",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op19",
+   "name": "Mauricio Sierra",
+   "home": "sin",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op20",
+   "name": "Natalia Álvarez",
+   "home": "sin",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op21",
+   "name": "Edwin Mendoza",
+   "home": "sin",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op22",
+   "name": "Karen Cárdenas",
+   "home": "sin",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op23",
+   "name": "Óscar Arrieta",
+   "home": "sin",
+   "flex": true,
+   "username": null
+  },
+  {
+   "id": "op24",
+   "name": "Viviana Díaz",
+   "home": "cer",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op25",
+   "name": "Gustavo Padilla",
+   "home": "cer",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op26",
+   "name": "Laura Mendoza",
+   "home": "tur",
+   "flex": false,
+   "username": "laura.mendoza"
+  },
+  {
+   "id": "op27",
+   "name": "Tatiana Ibáñez",
+   "home": "tur",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op28",
+   "name": "Iván Ortega",
+   "home": "mag",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op29",
+   "name": "Lorena Lozano",
+   "home": "sah",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op30",
+   "name": "Jhon Cabarcas",
+   "home": "sah",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op31",
+   "name": "Adriana Banquez",
+   "home": "cor",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op32",
+   "name": "Wilson Berrío",
+   "home": "cor",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op33",
+   "name": "Mónica Pineda",
+   "home": "car",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op34",
+   "name": "Ricardo Barrios",
+   "home": "lor",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op35",
+   "name": "Yesenia Salcedo",
+   "home": "mpx",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op36",
+   "name": "Fabián Torres",
+   "home": "cau",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op37",
+   "name": "Gloria Meza",
+   "home": "tol",
+   "flex": false,
+   "username": null
+  },
+  {
+   "id": "op38",
+   "name": "Alexis Peña",
+   "home": "plr",
+   "flex": false,
+   "username": null
+  }
+ ]
+}
