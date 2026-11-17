@@ -70,7 +70,7 @@ Pruebas:
 
 ```bash
 npm run test:malla   # 14 pruebas unitarias del motor de malla (sin servidor)
-npm run test:api     # 58 pruebas de extremo a extremo (con el servidor en marcha)
+npm run test:api     # 61 pruebas de extremo a extremo (con el servidor en marcha)
 npm test             # ejecuta ambas; la de la API necesita el servidor en marcha
 ```
 
@@ -140,7 +140,7 @@ surtigas-turnos/
 ├── server/
 │   ├── index.js             API REST, SQLite, autenticación, salas
 │   ├── malla.test.mjs       14 pruebas unitarias del motor de malla
-│   └── test-api.mjs         58 pruebas de extremo a extremo
+│   └── test-api.mjs         61 pruebas de extremo a extremo
 ├── scripts/
 │   ├── agregar-digiturno.py Agrega el Excel de Digiturno en historico.json (solo agregados)
 │   └── calibrar-kappa.mjs   Recalibra la disponibilidad κ (npm run calibrar)
@@ -170,7 +170,7 @@ surtigas-turnos/
 | [docs/motor-analitico.md](docs/motor-analitico.md) | Modelo de colas, calibración, algoritmo de recomendación |
 | [docs/hallazgos-datos.md](docs/hallazgos-datos.md) | Análisis del histórico de Digiturno |
 | [docs/gobernanza-y-privacidad.md](docs/gobernanza-y-privacidad.md) | Principios, Ley 1581 de 2012, condiciones previas al piloto |
-| [docs/pruebas.md](docs/pruebas.md) | Estrategia, las 14 pruebas unitarias y las 58 de la API, checklist manual |
+| [docs/pruebas.md](docs/pruebas.md) | Estrategia, las 14 pruebas unitarias y las 61 de la API, checklist manual |
 | [docs/despliegue.md](docs/despliegue.md) | Local, Docker, Render, Vercel, actualización y reinicio de datos |
 | [docs/diseno.md](docs/diseno.md) | Sistema de diseño, mockup de Figma, regeneración de SVG |
 | [docs/hoja-de-ruta.md](docs/hoja-de-ruta.md) | Pasos hacia un piloto real |

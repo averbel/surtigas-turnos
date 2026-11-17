@@ -5,8 +5,8 @@
 | Nivel | Qué cubre | Herramienta |
 |---|---|---|
 | Unitarias del motor de malla | Generación de la malla: plantilla, turnos, almuerzos, rotación, ausencias, reglas y CSV | `server/malla.test.mjs` (14 pruebas, `node:test`, sin servidor) |
-| API de extremo a extremo | Permisos, aislamiento por sala, flujo de verificación por tiempo, motor, rechazo y re-análisis, aprobación, malla de turnos y Nivel 0, administración | `server/test-api.mjs` (58 pruebas, sin dependencias; usa `fetch` de Node) |
-| Integración continua | Compilación de la web, las 14 pruebas unitarias y las 58 de la API contra un servidor recién levantado | `.github/workflows/ci.yml` |
+| API de extremo a extremo | Permisos, aislamiento por sala, flujo de verificación por tiempo, motor, rechazo y re-análisis, aprobación, malla de turnos y Nivel 0, administración | `server/test-api.mjs` (61 pruebas, sin dependencias; usa `fetch` de Node) |
+| Integración continua | Compilación de la web, las 14 pruebas unitarias y las 61 de la API contra un servidor recién levantado | `.github/workflows/ci.yml` |
 | Manual de interfaz | Recorrido por rol en escritorio y móvil | Checklist de este documento |
 
 No hay pruebas unitarias de `src/engine.js` con casos de referencia ni pruebas automatizadas de interfaz. El motor de colas se ejercita de forma indirecta a través de las pruebas de la malla (que dependen de la demanda, la espera y el personal requerido) y de la prueba de API «motor genera recomendación».
@@ -49,7 +49,7 @@ node server/test-api.mjs https://surtigas-turnos.onrender.com   # contra otra UR
 | 13 | hay advertencias de cobertura donde la capacidad es estructuralmente insuficiente | Existen y una es la de Cartagena el lunes |
 | 14 | la exportación CSV incluye a todos los operadores con sus 5 días | 39 líneas (cabecera y 38 colaboradores) |
 
-## Las 58 pruebas de la API
+## Las 61 pruebas de la API
 
 `server/test-api.mjs`. La numeración sigue el orden de ejecución. Las pruebas 29 a 44 son las de la malla de turnos y el Nivel 0.
 
@@ -100,19 +100,19 @@ node server/test-api.mjs https://surtigas-turnos.onrender.com   # contra otra UR
 | | 43 | con 42 h vuelve a poder aprobarse | 200 |
 | Aislamiento de la malla | 44 | la malla de otra sala no cambió | `approved` nulo en la sala B |
 | Ramas del colaborador | 45 | confirma presencia | `resuelto`, `lauraIn` verdadero |
-| | 46 | «No podré asistir» escala al encargado | `escalado`, nivel 3 |
-| | 47 | el encargado marca un cambio autorizado | `resuelto`, sin ausencias |
+| | 49 | «No podré asistir» escala al encargado | `escalado`, nivel 3 |
+| | 50 | el encargado marca un cambio autorizado | `resuelto`, sin ausencias |
 | Asistencia y corrección | 48 | registro de ingreso | 200 |
-| | 49 | corrección vacía | 400 |
-| | 50 | solicitud de corrección | 201 |
+| | 52 | corrección vacía | 400 |
+| | 53 | solicitud de corrección | 201 |
 | Administración | 51 | admin actualiza parámetros | 200 y `waitWarn` = 30 |
-| | 52 | los parámetros no afectan a otra sala | `waitWarn` de B = 45 |
-| | 53 | admin completa gobernanza | 200 y las 4 condiciones verdaderas |
-| | 54 | admin lista usuarios | 200 y al menos 3 usuarios |
-| | 55 | admin desactiva un usuario | 200 y `active` falso |
-| | 56 | usuario desactivado no puede entrar a esa sala | 403 |
-| | 57 | puede entrar a otra sala (la desactivación es por sala) | 200 |
-| | 58 | no puede desactivarse a sí mismo | 400 |
+| | 55 | los parámetros no afectan a otra sala | `waitWarn` de B = 45 |
+| | 56 | admin completa gobernanza | 200 y las 4 condiciones verdaderas |
+| | 57 | admin lista usuarios | 200 y al menos 3 usuarios |
+| | 58 | admin desactiva un usuario | 200 y `active` falso |
+| | 59 | usuario desactivado no puede entrar a esa sala | 403 |
+| | 60 | puede entrar a otra sala (la desactivación es por sala) | 200 |
+| | 61 | no puede desactivarse a sí mismo | 400 |
 
 ## Checklist de pruebas manuales de la interfaz
 

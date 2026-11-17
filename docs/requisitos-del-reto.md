@@ -44,7 +44,7 @@ Lo que condiciona todas las filas:
 |---|---|
 | Estado | Cumplido (prototipo) |
 | Dónde está | Aplicación web React (`src/`) y API Express con SQLite (`server/index.js`). Tres roles. Para turnos: pantalla «Malla de turnos» del encargado (`src/views/Malla.jsx`, motor en `src/malla.js`) y «Tu turno de hoy» y «Tu semana» del colaborador (`src/views/Collaborator.jsx`) |
-| Cómo se verifica | `npm test` (14 pruebas del motor de malla y 58 de la API). Manual: entrar como Encargado, abrir «Malla de turnos», programar una ausencia, aprobar y exportar el CSV; entrar como Colaborador y ver la semana |
+| Cómo se verifica | `npm test` (14 pruebas del motor de malla y 61 de la API). Manual: entrar como Encargado, abrir «Malla de turnos», programar una ausencia, aprobar y exportar el CSV; entrar como Colaborador y ver la semana |
 | Brecha | Datos de personal ficticios; no hay importación de la nómina real. Autenticación de demostración. El mockup de Figma (10 frames) no incluye la pantalla de la malla. Los tipos de turno reales y las reglas laborales reales no están modelados |
 
 ### 2. Motor de asignación automática de recursos
@@ -116,7 +116,7 @@ Lo que condiciona todas las filas:
 |---|---|
 | Estado | Parcial |
 | Dónde está | Prototipo desplegado (Render para la demo completa, Vercel para el sitio estático), con CI en `.github/workflows/ci.yml` que compila y ejecuta las pruebas |
-| Cómo se verifica | `npm test` (72 pruebas: 14 unitarias y 58 de API). Manual: [checklist de pruebas](pruebas.md#checklist-de-pruebas-manuales-de-la-interfaz) |
+| Cómo se verifica | `npm test` (72 pruebas: 14 unitarias y 61 de API). Manual: [checklist de pruebas](pruebas.md#checklist-de-pruebas-manuales-de-la-interfaz) |
 | Brecha | TLR 6 requiere demostrar el prototipo en un entorno relevante. Lo logrado es un prototipo probado de forma automática con datos históricos reales agregados y personal simulado. No hay piloto en una oficina real ni pruebas con usuarios. Escalabilidad no demostrada: una sola instancia, SQLite en un archivo, sin prueba de carga. Para cerrar este requisito se necesita un piloto (ver [hoja de ruta](hoja-de-ruta.md)) |
 
 ## Necesidades de la Fase 1
@@ -183,7 +183,7 @@ Lo que condiciona todas las filas:
 npm install
 npm run test:malla   # 14 pruebas unitarias del motor de malla (no necesita servidor)
 npm start            # en otra terminal: web y API en http://localhost:3001
-npm run test:api     # 58 pruebas de extremo a extremo (unos 50 s)
+npm run test:api     # 61 pruebas de extremo a extremo (unos 50 s)
 npm run calibrar -- --dry   # recalcula κ y muestra el error medio global (7,5 min) sin escribir nada
 ```
 

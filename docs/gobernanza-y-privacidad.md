@@ -80,7 +80,7 @@ Qué no maneja:
 Hoy la malla trabaja con una plantilla ficticia. Cuando se use la nómina real conviene tener presente:
 
 - La nómina y las ausencias programadas son datos personales de los colaboradores. No deben versionarse en un repositorio público ni quedar en `src/data/roster.json` fuera de un entorno controlado.
-- Una incapacidad puede revelar información de salud. Si se registra con personas reales, Jurídica debe definir si constituye dato sensible bajo la Ley 1581 y qué tratamiento exige (finalidad, autorización y quién puede verlo).
+- Una incapacidad puede revelar información de salud. El prototipo aplica minimización de datos: el servidor entrega las ausencias programadas y su registro en la trazabilidad solo al encargado y al administrador; un colaborador ve únicamente las suyas (prueba de API 45 a 47). Si se registra con personas reales, Jurídica debe definir si constituye dato sensible bajo la Ley 1581 y qué tratamiento exige (finalidad, autorización y quién puede verlo).
 - En el prototipo la interfaz muestra la malla solo al encargado, pero la API la entrega a cualquier rol autenticado: `GET /api/state` y `GET /api/malla` incluyen las ausencias programadas con su tipo. Antes de un piloto debe restringirse por rol y por oficina.
 - El tope de horas semanales y las demás reglas laborales (jornada máxima, descansos, recargos) los define Talento Humano con Jurídica; el prototipo solo implementa un tope parametrizable.
 - Los tipos de turno reales (hoy dos plantillas de ejemplo, A y B) y las reglas de ausencia los define Surtigas.

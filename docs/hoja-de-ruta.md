@@ -14,7 +14,7 @@ Punto de partida: prototipo funcional (Fase 2) con histórico agregado, un motor
 | Persistencia | SQLite en un solo archivo; en Render gratuito se pierde al reiniciar |
 | Observabilidad | Solo `console.log`/`console.error` y `/api/health` |
 | Corrección de datos (Ley 1581) | Se almacenan las solicitudes; no hay bandeja de atención |
-| Pruebas | 14 unitarias del motor de malla y 58 de API; sin pruebas unitarias de `engine.js` ni de interfaz |
+| Pruebas | 14 unitarias del motor de malla y 61 de API; sin pruebas unitarias de `engine.js` ni de interfaz |
 | TLR 6 | No demostrado: requiere un piloto en un entorno relevante (una oficina real) |
 | Validación con usuarios | No realizada |
 

@@ -43,7 +43,7 @@ Si hay un cuarto de minuto de sobra: pulsar una oficina para mostrar la curva de
 | Cartagena | 247 turnos por día, espera mediana de 70 min |
 | Error del modelo | 7,5 min de media |
 | Caso de la demo | Turbaco sin cambios 113 min; traslado 4 min; virtual 23 min |
-| Pruebas | 14 unitarias del motor de malla y 58 de extremo a extremo |
+| Pruebas | 14 unitarias del motor de malla y 61 de extremo a extremo |
 | Malla (plantilla ficticia, parámetros por defecto) | 38 colaboradores (31 de planta y 7 flexibles), cobertura del 71 % de las horas con demanda, 12 turnos de rotación, sin incumplimientos duros |
 
 ## Plan B

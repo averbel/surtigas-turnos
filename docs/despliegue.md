@@ -42,7 +42,7 @@ npm run server   # API en http://localhost:3001
 npm run dev      # web en http://localhost:5173 con proxy de /api hacia :3001
 ```
 
-Comprobación: `curl http://localhost:3001/api/health`. Pruebas: `npm run test:malla` (14 pruebas unitarias, sin servidor), `npm run test:api` (58 pruebas, con el servidor en marcha) o `npm test` (ambas en orden). Ver [pruebas](pruebas.md).
+Comprobación: `curl http://localhost:3001/api/health`. Pruebas: `npm run test:malla` (14 pruebas unitarias, sin servidor), `npm run test:api` (61 pruebas, con el servidor en marcha) o `npm test` (ambas en orden). Ver [pruebas](pruebas.md).
 
 ## Scripts de datos
 
@@ -129,7 +129,7 @@ Netlify es equivalente: `netlify.toml` define `npm run build` y publica `dist`.
 
 ## Integración continua
 
-`.github/workflows/ci.yml` se ejecuta en cada push a `main` y en cada pull request: instala con `npm ci`, compila, levanta el servidor con un `DATA_DIR` temporal, espera `/api/health` y ejecuta las pruebas: la unitaria del motor de malla (`npm run test:malla`, antes de levantar el servidor) y las 58 de la API (`npm run test:api`).
+`.github/workflows/ci.yml` se ejecuta en cada push a `main` y en cada pull request: instala con `npm ci`, compila, levanta el servidor con un `DATA_DIR` temporal, espera `/api/health` y ejecuta las pruebas: la unitaria del motor de malla (`npm run test:malla`, antes de levantar el servidor) y las 61 de la API (`npm run test:api`).
 
 ## Cómo actualizar
 
@@ -140,7 +140,7 @@ Netlify es equivalente: `netlify.toml` define `npm run build` y publica `dist`.
 | Docker | `docker build` de nuevo, detener y reiniciar el contenedor con el mismo volumen |
 | Local | `git pull`, `npm install` y `npm start` |
 
-Antes de publicar: `npm run build` y, con el servidor en marcha, `npm test` (14 unitarias y 58 de API).
+Antes de publicar: `npm run build` y, con el servidor en marcha, `npm test` (14 unitarias y 61 de API).
 
 El esquema se crea con `CREATE TABLE IF NOT EXISTS` y una migración que añade la columna `room`; no hay un sistema de migraciones versionadas, de modo que un cambio de esquema futuro requiere agregar su propia migración.
 
@@ -161,4 +161,4 @@ El esquema se crea con `CREATE TABLE IF NOT EXISTS` y una migración que añade 
 - [ ] `AUTH_SECRET` definido (no depender del archivo `.secret` en discos efímeros).
 - [ ] `DEMO_PASSWORD` distinta de la de por defecto si la URL es pública.
 - [ ] `DATA_DIR` en un disco persistente si los datos importan.
-- [ ] Las 58 pruebas de la API pasan contra la URL desplegada (`node server/test-api.mjs <URL>`); las 14 unitarias de la malla se ejecutan en local o en CI.
+- [ ] Las 61 pruebas de la API pasan contra la URL desplegada (`node server/test-api.mjs <URL>`); las 14 unitarias de la malla se ejecutan en local o en CI.

@@ -218,25 +218,30 @@ function invalidateApproval(room) {
   kvSet(room, 'malla', m)
   return m
 }
-const mallaView = (room) => {
+// Minimización de datos (Ley 1581): las ausencias programadas, que pueden revelar datos de salud
+// (incapacidades), solo las ven el encargado y el administrador; un colaborador ve únicamente las suyas.
+const SENSITIVE_LOG = /registró (incapacidad|permiso|vacaciones)|ausencia programada de|quitó la ausencia/i
+const mallaView = (room, viewer) => {
   const m = getMalla(room)
-  return { absences: m.absences, rotation: m.rotation, version: m.version, approved: m.approved && { ...m.approved, stale: m.approved.version !== m.version } }
+  const own = viewer?.role === 'colaborador' ? operatorByUsername(viewer.username)?.id : null
+  const absences = viewer?.role === 'colaborador' ? m.absences.filter((a) => a.op === own) : m.absences
+  return { absences, rotation: m.rotation, version: m.version, approved: m.approved && { ...m.approved, stale: m.approved.version !== m.version } }
 }
 
-function fullState(room) {
+function fullState(room, viewer) {
   const c = advanceCase(room, currentCase(room))
   const rec = c ? db.prepare('SELECT * FROM recs WHERE case_id = ? ORDER BY id DESC LIMIT 1').get(c.id) : null
   return {
     room,
     params: kvGet(room, 'params', {}),
     governance: kvGet(room, 'governance'),
-    malla: mallaView(room),
+    malla: mallaView(room, viewer),
     caseState: caseView(c),
     rec: recView(rec),
     moves: getMoves(room),
     absences: getAbsences(room),
     lauraIn: kvGet(room, 'lauraIn', false),
-    log: db.prepare('SELECT id, t, actor, text, tone FROM audit WHERE room = ? ORDER BY id DESC LIMIT 60').all(room),
+    log: db.prepare('SELECT id, t, actor, text, tone FROM audit WHERE room = ? ORDER BY id DESC LIMIT 60').all(room).filter((l) => viewer?.role !== 'colaborador' || !SENSITIVE_LOG.test(l.text)),
     serverTime: Date.now(),
   }
 }
@@ -280,7 +285,7 @@ app.post('/api/auth/login', (req, res) => {
 })
 app.get('/api/me', auth(), (req, res) => res.json({ user: publicUser(req.user, req.room), room: req.room }))
 
-app.get('/api/state', auth(), (req, res) => res.json(fullState(req.room)))
+app.get('/api/state', auth(), (req, res) => res.json(fullState(req.room, req.user)))
 
 // Parámetros y gobernanza: solo el administrador escribe.
 app.put('/api/params', auth('admin'), (req, res) => {
@@ -331,7 +336,7 @@ app.post('/api/attendance/checkin', auth('colaborador'), (req, res) => {
   } else {
     audit(room, req.user.name, 'Autenticación de asistencia desde el puesto de trabajo.', 'ok', simMin)
   }
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 
 // Corrección de datos personales (Ley 1581): solicitud del colaborador.
@@ -361,7 +366,7 @@ app.post('/api/demo/trigger', auth(), (req, res) => {
   db.prepare("INSERT INTO cases (room, person, office_id, stage, level, created_at) VALUES (?, ?, ?, 'no_registrado', 1, ?)").run(room, DEMO_PERSON.name, DEMO_PERSON.office, Date.now())
   audit(room, 'Sistema', `Nivel 0 · Malla v${mState.version} sincronizada: ${DEMO_PERSON.name} figura en ${SHIFT_TYPES[slot.shift].label} (${shiftText(slot.shift)}) en ${officeById(slot.office).name}.`, null, simMin)
   audit(room, 'Sistema', `Nivel 1 · ${DEMO_PERSON.name} aparece como «no registrado» en ${officeById(DEMO_PERSON.office).name}. No se declara ausencia.`, 'warn', simMin)
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 app.post('/api/demo/reset', auth(), (req, res) => {
   const room = req.room
@@ -369,7 +374,7 @@ app.post('/api/demo/reset', auth(), (req, res) => {
   kvSet(room, 'lauraIn', false)
   kvSet(room, 'malla', { absences: [], rotation: MALLA_DEFAULTS.rotation, version: 1, approved: null })
   audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13)
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 
 // Respuesta del colaborador en el Nivel 2.
@@ -387,7 +392,7 @@ app.post('/api/cases/current/respond', auth('colaborador'), (req, res) => {
     db.prepare("UPDATE cases SET stage='escalado', level=3, note='El colaborador informa que no podrá asistir' WHERE id=?").run(c.id)
     audit(room, req.user.name, 'Informó que no podrá asistir. Se escala al encargado para confirmación (Nivel 3).', 'warn', simMin)
   }
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 
 // Decisiones del encargado: única persona autorizada a confirmar una ausencia.
@@ -397,7 +402,7 @@ app.post('/api/cases/current/authorized', auth('encargado'), (req, res) => {
   if (!c || c.stage !== 'escalado') return res.status(409).json({ error: 'El caso aún no está en el Nivel 3.' })
   db.prepare("UPDATE cases SET stage='resuelto', resolution='reasignacion' WHERE id=?").run(c.id)
   audit(room, 'Encargada', 'Verificó un cambio autorizado fuera de la malla. No es una ausencia.', 'ok', num(req.body?.simMin, null))
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 app.post('/api/cases/current/confirm', auth('encargado'), (req, res) => {
   const room = req.room
@@ -412,7 +417,7 @@ app.post('/api/cases/current/confirm', auth('encargado'), (req, res) => {
   // El motor reevalúa la capacidad con la ausencia confirmada.
   const r = createRecommendation(room, c, simMin, dow)
   audit(room, 'Motor', r.donor ? 'La capacidad cae por debajo de la demanda prevista. Se simularon alternativas de redistribución.' : 'La capacidad cae por debajo de la demanda prevista y ninguna oficina tiene holgura para prestar personal.', r.donor ? null : 'warn', simMin)
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 app.post('/api/recommendations/reanalyze', auth('encargado'), (req, res) => {
   const room = req.room
@@ -424,7 +429,7 @@ app.post('/api/recommendations/reanalyze', auth('encargado'), (req, res) => {
   const dow = Math.min(4, Math.max(0, num(req.body?.dow, 4)))
   const r = createRecommendation(room, c, simMin, dow)
   audit(room, 'Motor', r.donor ? 'Nueva recomendación generada descartando las alternativas rechazadas.' : 'No quedan oficinas con holgura para prestar personal, una vez descartadas las alternativas rechazadas.', r.donor ? null : 'warn', simMin)
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 app.post('/api/recommendations/:id/decision', auth('encargado'), (req, res) => {
   const room = req.room
@@ -443,13 +448,13 @@ app.post('/api/recommendations/:id/decision', auth('encargado'), (req, res) => {
     db.prepare("UPDATE recs SET status='rechazada' WHERE id=?").run(r.id)
     audit(room, 'Encargada', 'Rechazó la recomendación. Puedes pedir otra alternativa al motor.', 'warn', simMin)
   }
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 
 // Malla de turnos (encargado): ausencias programadas, rotación y aprobación.
 app.get('/api/malla', auth(), (req, res) => {
   const m = computeMalla(req.room)
-  res.json({ ...mallaView(req.room), summary: m.summary, violations: m.violations })
+  res.json({ ...mallaView(req.room, req.user), summary: m.summary, violations: m.violations })
 })
 app.put('/api/malla/absences', auth('encargado'), (req, res) => {
   const room = req.room
@@ -465,7 +470,7 @@ app.put('/api/malla/absences', auth('encargado'), (req, res) => {
   m.version += 1
   kvSet(room, 'malla', m)
   audit(room, 'Encargada', absent ? `Registró ${ABSENCE_KINDS[kind].toLowerCase()} de ${op.name} el ${MALLA_DAYS[dow].toLowerCase()}; la malla se recalculó.` : `Quitó la ausencia programada de ${op.name} el ${MALLA_DAYS[dow].toLowerCase()}.`, absent ? 'warn' : null, num(req.body?.simMin, null))
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 app.put('/api/malla/settings', auth('encargado'), (req, res) => {
   const room = req.room
@@ -474,7 +479,7 @@ app.put('/api/malla/settings', auth('encargado'), (req, res) => {
   m.version += 1
   kvSet(room, 'malla', m)
   audit(room, 'Encargada', `${m.rotation ? 'Activó' : 'Desactivó'} la rotación del personal flexible entre oficinas; la malla se recalculó.`, null, num(req.body?.simMin, null))
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 app.post('/api/malla/approve', auth('encargado'), (req, res) => {
   const room = req.room
@@ -486,7 +491,7 @@ app.post('/api/malla/approve', auth('encargado'), (req, res) => {
   m.approved = { version: m.version, at: Date.now(), by: req.user.name }
   kvSet(room, 'malla', m)
   audit(room, 'Encargada', `Aprobó la malla de turnos (versión ${m.version}): cobertura ${calc.summary.coveragePct} %, ${calc.violations.filter((v) => v.level === 'warn').length} advertencia(s) de cobertura.`, 'ok', num(req.body?.simMin, null))
-  res.json(fullState(room))
+  res.json(fullState(room, req.user))
 })
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }))

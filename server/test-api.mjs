@@ -110,6 +110,16 @@ await call('PUT', '/api/params', { waitOk: 20, waitWarn: 45, maxKm: 60, muScale:
 ok('con 42 h vuelve a poder aprobarse', (await call('POST', '/api/malla/approve', {}, enc)).s === 200)
 ok('la malla de otra sala no cambió', (await call('GET', '/api/malla', null, encB)).j.approved === null)
 
+// Privacidad: las incapacidades no son visibles para otros colaboradores
+const jorgeTok = await login('jorge.pineda', A)
+await call('PUT', '/api/malla/absences', { op: opLaura, dow: 2, absent: true, kind: 'incapacidad' }, enc)
+const verJorge = (await call('GET', '/api/state', null, jorgeTok)).j
+ok('otro colaborador no ve la incapacidad de Laura (minimización de datos)', verJorge.malla.absences.length === 0 && !verJorge.log.some((l) => /incapacidad/i.test(l.text)))
+const verLaura = (await call('GET', '/api/state', null, col)).j
+ok('Laura sí ve su propia ausencia', verLaura.malla.absences.length === 1 && verLaura.malla.absences[0].op === opLaura)
+ok('el encargado ve todas las ausencias y el registro completo', (await call('GET', '/api/state', null, enc)).j.log.some((l) => /incapacidad/i.test(l.text)))
+await call('PUT', '/api/malla/absences', { op: opLaura, dow: 2, absent: false }, enc)
+
 // Rama: el colaborador responde presente / no podrá asistir
 await call('POST', '/api/demo/trigger', { simMin: 785 }, enc)
 await sleep(4000)

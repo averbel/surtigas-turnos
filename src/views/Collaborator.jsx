@@ -13,11 +13,11 @@ export default function Collaborator() {
   const me = user?.name ?? person.name
   const myWeek = mallaData?.operators.find((o) => o.username === (user?.username ?? 'laura.mendoza'))
   const today = myWeek?.week.find((d) => d.dow === params.dow)
+  const office = officeById(today && today.shift !== 'AUS' ? today.office : myWeek?.home ?? person.office).name
   const isCaseOwner = me === person.name
   const [ownIn, setOwnIn] = useState(false)
   const checkedIn = isCaseOwner ? lauraIn : ownIn
   const [corrText, setCorrText] = useState('')
-  const office = officeById(person.office).name
   const [auth, setAuth] = useState('idle') // idle | scanning
   const [corr, setCorr] = useState(false)
   const [open, setOpen] = useState(false)
