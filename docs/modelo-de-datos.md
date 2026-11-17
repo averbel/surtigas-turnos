@@ -142,10 +142,33 @@ Claves por sala:
 | Clave | Valor | Se crea |
 |---|---|---|
 | `governance` | `{ th, legal, ley, comm }` booleanos | Al crear la sala (todo en `false`) |
-| `params` | `{ waitOk, waitWarn, maxKm, muScale }` | Al crear la sala, con los valores por defecto del motor (20, 45, 60, 1) |
+| `params` | `{ waitOk, waitWarn, maxKm, muScale, maxWeeklyHours }` | Al crear la sala, con los valores por defecto (20, 45, 60, 1 y 42 h semanales) |
+| `malla` | `{ absences, rotation, version, approved }` (ver abajo) | Al crear la sala: sin ausencias, rotación activa, versión 1, sin aprobar |
 | `lauraIn` | booleano | Al crear la sala (`false`) |
 | `inactive` | arreglo de ids de usuario desactivados en la sala | Al crear la sala (`[]`) |
 | `simMin` | minutos simulados (número) | Al disparar la demo o confirmar una ausencia; si no existe se asume 785 (13:05) |
+
+#### Clave `malla`
+
+Estado de la malla de turnos de la sala. La malla en sí (turnos, cobertura, reglas) no se guarda: se calcula con `generateMalla` a partir de la plantilla, de este estado y de los parámetros.
+
+```json
+{
+  "absences": [ { "op": "op26", "dow": 4, "kind": "incapacidad" } ],
+  "rotation": true,
+  "version": 3,
+  "approved": { "version": 2, "at": 1760000000000, "by": "Marta Ríos" }
+}
+```
+
+| Campo | Descripción |
+|---|---|
+| `absences` | Ausencias programadas: id del colaborador (`roster.json`), día (0 lunes a 4 viernes) y tipo (`incapacidad`, `permiso`, `vacaciones`). Una por colaborador y día |
+| `rotation` | Permite que el personal flexible cambie de oficina |
+| `version` | Empieza en 1 y sube con cada cambio de ausencias, de rotación o de parámetros del administrador |
+| `approved` | `null` o la versión aprobada, el momento (ms epoch) y quién aprobó. La API añade `stale` al servirlo: verdadero si `approved.version` difiere de `version` |
+
+`POST /api/demo/reset` devuelve esta clave a su valor inicial. Ver [malla de turnos](malla-de-turnos.md#aprobación-y-vigencia).
 
 ### cases
 
@@ -241,7 +264,7 @@ Al iniciar, para las tablas `cases`, `recs`, `moves`, `absences`, `attendance`, 
 ```mermaid
 flowchart TD
   A["Login con código o sin código"] --> B{"Existe la sala?"}
-  B -- "No" --> C["ensureRoom: fila en rooms,<br/>claves kv iniciales,<br/>entrada Nivel 0 en audit"]
+  B -- "No" --> C["ensureRoom: fila en rooms,<br/>claves kv iniciales (incluida malla),<br/>entrada Nivel 0 en audit"]
   B -- "Sí" --> D["Se usa la sala existente"]
   C --> E["Peticiones autenticadas<br/>actualizan last_seen"]
   D --> E
@@ -252,9 +275,22 @@ flowchart TD
 
 - Creación: en el ingreso o en la primera petición autenticada con un token de esa sala.
 - Purga: `purgeRooms()` al iniciar el servidor y cada 30 minutos (`setInterval`, sin mantener vivo el proceso). Elimina las salas con `last_seen` anterior a 24 h.
-- `POST /api/demo/reset` limpia el caso, la recomendación, los traslados, las ausencias y la trazabilidad de la sala, pero conserva la sala, sus parámetros, la gobernanza y la asistencia.
+- `POST /api/demo/reset` limpia el caso, la recomendación, los traslados, las ausencias y la trazabilidad de la sala y reinicia la malla (clave `malla`), pero conserva la sala, sus parámetros (incluido el tope de horas semanales), la gobernanza y la asistencia.
 - Las pruebas automáticas crean las salas `TESTA1` y `TESTB2` y una sala aleatoria por ejecución; los parámetros y la gobernanza quedan restablecidos al terminar, y las salas se purgan por inactividad.
 
 ## Datos que no están en la base
 
-El histórico de Digiturno no se guarda en SQLite: es un archivo JSON versionado (`src/data/historico.json`) que se empaqueta con la web y con el servidor. Ver [hallazgos de datos](hallazgos-datos.md).
+El histórico de Digiturno no se guarda en SQLite: es un archivo JSON versionado (`src/data/historico.json`) que se empaqueta con la web y con el servidor. Se regenera con `scripts/agregar-digiturno.py` y se recalibra con `scripts/calibrar-kappa.mjs`. Ver [hallazgos de datos](hallazgos-datos.md).
+
+La plantilla de personal de la malla tampoco está en SQLite: es `src/data/roster.json`, común a todas las salas y también empaquetada con la web y con el servidor.
+
+| Campo de `roster.json` | Descripción |
+|---|---|
+| `nota` | Aviso en el propio archivo: plantilla ficticia para la demostración, a sustituir por la nómina real |
+| `operators[].id` | Identificador del colaborador (`op01` a `op38`); es el que usan las ausencias programadas |
+| `operators[].name` | Nombre simulado |
+| `operators[].home` | Id de la oficina base (uno de los 14) |
+| `operators[].flex` | `true` si puede rotar entre oficinas (7 de 38) |
+| `operators[].username` | Cuenta de demostración vinculada o `null` (3 de 38) |
+
+Cómo sustituirla por la nómina real: ver [malla de turnos](malla-de-turnos.md#cómo-reemplazar-la-plantilla-ficticia-por-la-nómina-real).

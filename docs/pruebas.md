@@ -4,27 +4,54 @@
 
 | Nivel | Qué cubre | Herramienta |
 |---|---|---|
-| API de extremo a extremo | Permisos, aislamiento por sala, flujo de verificación por tiempo, motor, rechazo y re-análisis, aprobación, administración | `server/test-api.mjs` (sin dependencias; usa `fetch` de Node) |
-| Integración continua | Compilación de la web y las 42 pruebas contra un servidor recién levantado | `.github/workflows/ci.yml` |
+| Unitarias del motor de malla | Generación de la malla: plantilla, turnos, almuerzos, rotación, ausencias, reglas y CSV | `server/malla.test.mjs` (14 pruebas, `node:test`, sin servidor) |
+| API de extremo a extremo | Permisos, aislamiento por sala, flujo de verificación por tiempo, motor, rechazo y re-análisis, aprobación, malla de turnos y Nivel 0, administración | `server/test-api.mjs` (58 pruebas, sin dependencias; usa `fetch` de Node) |
+| Integración continua | Compilación de la web, las 14 pruebas unitarias y las 58 de la API contra un servidor recién levantado | `.github/workflows/ci.yml` |
 | Manual de interfaz | Recorrido por rol en escritorio y móvil | Checklist de este documento |
 
-No hay pruebas unitarias del motor ni pruebas automatizadas de interfaz. El motor se ejercita de forma indirecta a través de la prueba «motor genera recomendación» (donante, escenarios).
+No hay pruebas unitarias de `src/engine.js` con casos de referencia ni pruebas automatizadas de interfaz. El motor de colas se ejercita de forma indirecta a través de las pruebas de la malla (que dependen de la demanda, la espera y el personal requerido) y de la prueba de API «motor genera recomendación».
 
 ## Cómo ejecutarlas
 
 ```bash
+npm run test:malla             # 14 pruebas unitarias; no necesita servidor
 npm run server                 # en una terminal (o npm start)
 npm run test:api               # en otra; por defecto contra http://localhost:3001
+npm test                       # ejecuta test:malla y luego test:api (el servidor debe estar en marcha)
 node server/test-api.mjs https://surtigas-turnos.onrender.com   # contra otra URL
 ```
 
-- Duración: unos 50 segundos, porque espera los plazos reales de la verificación (3,5 s y 16 s) varias veces.
-- Variable `DEMO_PASSWORD`: si el servidor usa otra clave, defínela también para la prueba.
-- Salida: una línea `OK` o `FAIL` por prueba y un resumen. El código de salida es 0 si todas pasan y 1 si alguna falla.
-- Las pruebas usan las salas `TESTA1` y `TESTB2` (más una sala aleatoria en la prueba de asignación). Al terminar restablecen la demo, los parámetros y la gobernanza de `TESTA1`; las salas se eliminan por inactividad a las 24 h. Contra el sitio de Render, las pruebas modifican esas salas de ese servicio.
-- En CI (Node 24) el servidor se levanta con `DATA_DIR` temporal y se espera hasta 20 s a `/api/health`.
+- `npm test` ejecuta `node --test server/malla.test.mjs && node server/test-api.mjs`. Si la unitaria falla, no se ejecuta la de la API.
+- Duración de la unitaria: menos de un segundo. Duración de la API: unos 50 segundos, porque espera los plazos reales de la verificación (3,5 s y 16 s) varias veces.
+- Variable `DEMO_PASSWORD`: si el servidor usa otra clave, defínela también para la prueba de la API.
+- Salida: una línea `OK` o `FAIL` por prueba de la API y un resumen. El código de salida es 0 si todas pasan y 1 si alguna falla.
+- Las pruebas de la API usan las salas `TESTA1` y `TESTB2` (más una sala aleatoria en la prueba de asignación). Al terminar restablecen la demo, los parámetros y la gobernanza de `TESTA1` (y la malla, con el reinicio de la demo); las salas se eliminan por inactividad a las 24 h. Contra el sitio de Render, las pruebas modifican esas salas de ese servicio.
+- En CI (Node 24) el servidor se levanta con `DATA_DIR` temporal y se espera hasta 20 s a `/api/health`. El flujo ejecuta `npm run test:malla` antes de levantar el servidor y `npm run test:api` después.
 
-## Las 42 pruebas de la API
+## Las 14 pruebas unitarias del motor de malla
+
+`server/malla.test.mjs`. Usan la plantilla ficticia y los parámetros por defecto.
+
+| # | Prueba | Qué comprueba |
+|---|---|---|
+| 1 | hay 38 operadores y 7 que rotan | Tamaño de la plantilla y colaboradores flexibles |
+| 2 | cada operador sin ausencia tiene exactamente un turno por día | 5 entradas por colaborador, una por día, todas en turno A o B |
+| 3 | es determinista | Dos generaciones iguales producen el mismo resultado |
+| 4 | la cobertura de cada oficina es la suma de sus operadores programados | Reparto A y B coherente; a las 07:30 trabajan todos |
+| 5 | todos los operadores quedan asignados cada día (sin ausencias) | 38 asignaciones por día |
+| 6 | el almuerzo se escalona en oficinas con 2 o más personas | Hay al menos una persona en cada turno cuando se requiere servicio en la franja de las 12:00 |
+| 7 | la rotación solo mueve a colaboradores flexibles y dentro del radio | Las visitas son de flexibles y a `maxKm` o menos; se usa al menos una vez |
+| 8 | la rotación no empeora el déficit frente a no rotar | Déficit con rotación menor o igual al de sin rotación; sin rotación no hay visitas |
+| 9 | una ausencia programada quita al operador de la malla y reduce horas | Turno `AUS`, 32 h semanales y fuera de la tripulación de Turbaco |
+| 10 | Laura Mendoza está programada el viernes en Turbaco | Base del caso de demostración y del Nivel 0 |
+| 11 | el tope de horas semanales genera una violación dura | Sin incumplimientos con 42 h; con 36 h, los 38 incumplen |
+| 12 | el lunes tiene más personal requerido que el viernes | El requerido sigue el factor del día |
+| 13 | hay advertencias de cobertura donde la capacidad es estructuralmente insuficiente | Existen y una es la de Cartagena el lunes |
+| 14 | la exportación CSV incluye a todos los operadores con sus 5 días | 39 líneas (cabecera y 38 colaboradores) |
+
+## Las 58 pruebas de la API
+
+`server/test-api.mjs`. La numeración sigue el orden de ejecución. Las pruebas 29 a 44 son las de la malla de turnos y el Nivel 0.
 
 | Grupo | # | Prueba | Resultado esperado |
 |---|---|---|---|
@@ -56,20 +83,36 @@ node server/test-api.mjs https://surtigas-turnos.onrender.com   # contra otra UR
 | | 26 | segunda decisión | 409 |
 | | 27 | trazabilidad registra las acciones | Al menos 7 entradas |
 | | 28 | la sala B sigue intacta tras operar en A | Sin traslados en B |
-| Ramas del colaborador | 29 | confirma presencia | `resuelto`, `lauraIn` verdadero |
-| | 30 | «No podré asistir» escala al encargado | `escalado`, nivel 3 |
-| | 31 | el encargado marca un cambio autorizado | `resuelto`, sin ausencias |
-| Asistencia y corrección | 32 | registro de ingreso | 200 |
-| | 33 | corrección vacía | 400 |
-| | 34 | solicitud de corrección | 201 |
-| Administración | 35 | admin actualiza parámetros | 200 y `waitWarn` = 30 |
-| | 36 | los parámetros no afectan a otra sala | `waitWarn` de B = 45 |
-| | 37 | admin completa gobernanza | 200 y las 4 condiciones verdaderas |
-| | 38 | admin lista usuarios | 200 y al menos 3 usuarios |
-| | 39 | admin desactiva un usuario | 200 y `active` falso |
-| | 40 | usuario desactivado no puede entrar a esa sala | 403 |
-| | 41 | puede entrar a otra sala (la desactivación es por sala) | 200 |
-| | 42 | no puede desactivarse a sí mismo | 400 |
+| Malla de turnos | 29 | la malla se genera con cobertura y violaciones | 38 colaboradores, cobertura mayor que 0 y lista de reglas |
+| | 30 | sin aprobar al inicio | `approved` nulo y versión de 1 o más |
+| | 31 | colaborador no puede registrar ausencias | 403 |
+| | 32 | colaborador no puede aprobar la malla | 403 |
+| | 33 | día fuera de rango | 400 |
+| | 34 | colaborador desconocido | 404 |
+| | 35 | el encargado registra una incapacidad | Una ausencia de tipo `incapacidad` en el estado |
+| Nivel 0 | 36 | con incapacidad programada no hay caso «no registrado» | 409 con el mensaje de ausencia programada |
+| | 37 | al quitar la ausencia vuelve a poder crearse el caso | Sin ausencias programadas |
+| | 38 | la trazabilidad cita la malla en el Nivel 0 | Entrada «Nivel 0 · Malla vN sincronizada» con Laura Mendoza |
+| Aprobación de la malla | 39 | el encargado aprueba la malla | `approved` vigente (`stale` falso), con la versión actual y firmada por Marta Ríos |
+| | 40 | cambiar la rotación recalcula y deja la aprobación vencida | Rotación desactivada, `stale` verdadero y versión mayor |
+| | 41 | la rotación desactivada elimina los turnos visitantes | `visitingShifts` igual a 0 |
+| Reglas laborales | 42 | con tope de 36 h no se puede aprobar | 409 con 38 incumplimientos |
+| | 43 | con 42 h vuelve a poder aprobarse | 200 |
+| Aislamiento de la malla | 44 | la malla de otra sala no cambió | `approved` nulo en la sala B |
+| Ramas del colaborador | 45 | confirma presencia | `resuelto`, `lauraIn` verdadero |
+| | 46 | «No podré asistir» escala al encargado | `escalado`, nivel 3 |
+| | 47 | el encargado marca un cambio autorizado | `resuelto`, sin ausencias |
+| Asistencia y corrección | 48 | registro de ingreso | 200 |
+| | 49 | corrección vacía | 400 |
+| | 50 | solicitud de corrección | 201 |
+| Administración | 51 | admin actualiza parámetros | 200 y `waitWarn` = 30 |
+| | 52 | los parámetros no afectan a otra sala | `waitWarn` de B = 45 |
+| | 53 | admin completa gobernanza | 200 y las 4 condiciones verdaderas |
+| | 54 | admin lista usuarios | 200 y al menos 3 usuarios |
+| | 55 | admin desactiva un usuario | 200 y `active` falso |
+| | 56 | usuario desactivado no puede entrar a esa sala | 403 |
+| | 57 | puede entrar a otra sala (la desactivación es por sala) | 200 |
+| | 58 | no puede desactivarse a sí mismo | 400 |
 
 ## Checklist de pruebas manuales de la interfaz
 
@@ -90,6 +133,11 @@ Marcar en cada ciclo de entrega. Probar con servidor (modo API) y, aparte, el si
 - [ ] Selector de día y de hora: lunes 08:00 muestra 10 críticas; viernes 13:05 ninguna.
 - [ ] Panel de oficina: curvas, indicadores e histórico.
 - [ ] Barra DEMO: inicia el caso y luego reinicia.
+- [ ] Malla de turnos: 4 indicadores, selector de oficina, cuadrícula semanal, mapa de cobertura con pestañas de día y resumen por oficina.
+- [ ] Malla de turnos: programar una incapacidad de Laura Mendoza el viernes marca la celda como ausente, baja sus horas a 32 y deja la malla «Vencida» si estaba aprobada; «Quitar ausencia» la deshace.
+- [ ] Malla de turnos: con la ausencia programada, «Simular persona no registrada» no abre el caso y avisa (Nivel 0); sin ella, la Verificación muestra la línea «Nivel 0 · Malla vN».
+- [ ] Malla de turnos: la rotación activa o desactivada cambia los turnos de visita; «Aprobar malla» pasa a «Aprobada vN»; «Exportar CSV» descarga `malla-<oficina>-semana.csv`.
+- [ ] Administrador: con el tope de horas en 36 h la malla no se puede aprobar; con 42 h sí.
 - [ ] Verificación: pasa por los niveles 1, 2 y 3; los botones solo se habilitan en el Nivel 3.
 - [ ] «Confirmar ausencia»: Turbaco pasa a crítica y aparece la recomendación.
 - [ ] Recomendaciones: tres escenarios, elegir virtual, aprobar; la insignia desaparece.
@@ -105,14 +153,16 @@ Marcar en cada ciclo de entrega. Probar con servidor (modo API) y, aparte, el si
 - [ ] «Sí, estoy aquí» cierra el caso; «No podré asistir» lo escala.
 - [ ] «Registrar ingreso» simula la autenticación y se marca como hecho.
 - [ ] Con un caso abierto a su nombre, registrar el ingreso lo cierra.
+- [ ] «Tu turno de hoy» y «Tu semana» coinciden con la malla (turno, oficina, ausencia programada) y muestran si la malla está aprobada o en borrador.
 - [ ] Panel de datos desplegable y «Solicitar corrección»: con menos de 5 caracteres el botón está deshabilitado; el envío muestra la confirmación.
 - [ ] La vista del encargado en otra pestaña refleja los cambios en pocos segundos.
 
 ### Administrador
 
 - [ ] Gobernanza: los cuatro interruptores actualizan el indicador (bloqueado, listo).
+- [ ] Parámetros: el slider «Tope de horas semanales» (30 a 60 h) se guarda por sala y deja la malla «Vencida».
 - [ ] Parámetros: mover los controles recalcula el dashboard del encargado de esa sala; «Restablecer valores» vuelve a los de por defecto.
-- [ ] Validación del modelo: cambiar de oficina actualiza la curva; muestra error medio de 7,6 min.
+- [ ] Validación del modelo: cambiar de oficina actualiza la curva; muestra error medio de 7,5 min.
 - [ ] Usuarios: desactivar a un usuario le impide entrar a esa sala; no se puede desactivar la propia cuenta.
 
 ### Transversales
@@ -126,7 +176,8 @@ Marcar en cada ciclo de entrega. Probar con servidor (modo API) y, aparte, el si
 
 ## Cobertura pendiente
 
-- Pruebas unitarias del motor (Erlang C con casos de referencia, cola fluida, semáforo, Haversine).
+- Pruebas unitarias del motor de colas `engine.js` (Erlang C con casos de referencia, cola fluida, semáforo, Haversine). Las del motor de malla ya existen.
+- Pruebas del script `scripts/agregar-digiturno.py` contra la exportación real de Digiturno: solo se probó con datos sintéticos del mismo formato.
 - Pruebas de interfaz automatizadas.
 - Prueba de carga y de concurrencia entre salas.
-- Pruebas de seguridad (fuerza bruta, manipulación de tokens más allá de las pruebas 3 y 4).
+- Pruebas de seguridad (fuerza bruta, manipulación de tokens más allá de las pruebas 3 y 4 de la API).

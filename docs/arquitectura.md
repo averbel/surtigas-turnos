@@ -2,7 +2,7 @@
 
 ## Visión general
 
-Aplicación de un solo servicio: un servidor Node (Express 5) que expone la API REST bajo `/api` y, si existe la carpeta `dist/`, sirve también el frontend compilado. El estado vive en SQLite (`node:sqlite`). El motor analítico (`src/engine.js`) es un módulo ES que importan tanto el navegador como el servidor, de modo que el cliente no puede falsear una recomendación: el servidor la recalcula con el mismo código.
+Aplicación de un solo servicio: un servidor Node (Express 5) que expone la API REST bajo `/api` y, si existe la carpeta `dist/`, sirve también el frontend compilado. El estado vive en SQLite (`node:sqlite`). El motor analítico (`src/engine.js`) y el motor de la malla de turnos (`src/malla.js`, que se apoya en el anterior) son módulos ES que importan tanto el navegador como el servidor, de modo que el cliente no puede falsear una recomendación ni aprobar una malla con incumplimientos: el servidor recalcula con el mismo código.
 
 El frontend funciona en dos modos, que se eligen al arrancar consultando `GET /api/health`:
 
@@ -21,9 +21,12 @@ flowchart LR
     UI["Vistas React<br/>Login, Manager, Collaborator, Admin"]
     ST["Estado: store-api.jsx<br/>(o store.jsx en modo local)"]
     EN1["engine.js<br/>cálculo del semáforo y gráficas"]
+    MG1["malla.js<br/>malla de turnos"]
     CL["api.js<br/>token + sala"]
     UI --> ST
     ST --> EN1
+    ST --> MG1
+    MG1 --> EN1
     ST --> CL
   end
   subgraph Servidor["Servidor Node (server/index.js)"]
@@ -31,16 +34,22 @@ flowchart LR
     AU["auth(...roles)<br/>token HMAC + sala"]
     RT["Rutas /api"]
     EN2["engine.js<br/>recomendaciones"]
+    MG2["malla.js<br/>validar y aprobar malla,<br/>Nivel 0"]
     DB[("SQLite<br/>DATA_DIR/app.db")]
     ST2["Estáticos dist/"]
     MW --> AU --> RT
     RT --> EN2
+    RT --> MG2
+    MG2 --> EN2
     RT --> DB
     MW --> ST2
   end
   H[("historico.json<br/>Digiturno agregado")]
+  RO[("roster.json<br/>plantilla ficticia")]
   EN1 --- H
   EN2 --- H
+  MG1 --- RO
+  MG2 --- RO
   CL -- "HTTP JSON, Bearer token" --> MW
 ```
 
@@ -50,16 +59,20 @@ Responsabilidades:
 |---|---|---|
 | Servidor | `server/index.js` | Rutas, base de datos, autenticación, salas, avance de la verificación por tiempo |
 | Motor | `src/engine.js` | Demanda, capacidad, Erlang C, cola fluida, semáforo, donante, escenarios |
+| Motor de malla | `src/malla.js` | Personal requerido por franja, reparto en turnos A y B, rotación del personal flexible, espera pico prevista, reglas y CSV. Ver [malla de turnos](malla-de-turnos.md) |
 | Datos | `src/data/historico.json` | Agregados por oficina y hora; parámetros calibrados (`mu`, `kappa`) |
+| Plantilla | `src/data/roster.json` | Personal de la malla: 38 colaboradores ficticios |
+| Scripts de datos | `scripts/agregar-digiturno.py`, `scripts/calibrar-kappa.mjs` | Regenerar el histórico agregado y recalibrar `κ` (fuera de la aplicación en ejecución) |
 | Estado en navegador | `src/store-api.jsx`, `src/store.jsx` | Reloj simulado, sondeo, métricas derivadas por oficina |
 | Cliente HTTP | `src/api.js` | Token en `sessionStorage`, sala en `localStorage`, manejo de errores |
-| Vistas | `src/views/*.jsx` | Interfaz por rol |
+| Vistas | `src/views/*.jsx` | Interfaz por rol; `Malla.jsx` es la vista de la malla del encargado |
 
 ## Qué se calcula dónde
 
 - El semáforo de las 14 oficinas se calcula en el navegador con `officeState()` a partir del estado del servidor (ausencias confirmadas, traslados aprobados, parámetros de la sala) y del reloj simulado de la sesión.
 - La recomendación se calcula en el servidor (`createRecommendation`) cuando el encargado confirma una ausencia o pide otra alternativa, y se guarda en la tabla `recs`.
 - Las transiciones de la verificación (Nivel 1 a 2 a 3) se calculan en el servidor al leer, sin temporizadores.
+- La malla se calcula en dos sitios con el mismo código: el servidor la genera para validarla al aprobar (`POST /api/malla/approve`) y para el Nivel 0 (`POST /api/demo/trigger`); el navegador la genera para mostrarla, a partir de las ausencias, la rotación y los parámetros que trae el estado de la sala. El servidor guarda solo ese estado y la aprobación (clave `kv` `malla`), no la malla calculada.
 
 ## Flujo de una petición
 
@@ -99,8 +112,8 @@ Cada visitante trabaja en una sala (código de 4 a 8 caracteres `A-Z0-9`; las ge
 
 | Ámbito | Datos |
 |---|---|
-| Comunes a todas las salas | Usuarios y contraseñas, histórico de Digiturno, motor |
-| Por sala | Casos, recomendaciones, traslados, ausencias, asistencia, solicitudes de corrección, trazabilidad, parámetros, checklist de gobernanza, usuarios desactivados |
+| Comunes a todas las salas | Usuarios y contraseñas, histórico de Digiturno, plantilla de personal (`roster.json`), motores |
+| Por sala | Casos, recomendaciones, traslados, ausencias, asistencia, solicitudes de corrección, trazabilidad, parámetros (incluido el tope de horas semanales), estado de la malla (ausencias programadas, rotación, versión y aprobación), checklist de gobernanza, usuarios desactivados |
 
 Cómo se asigna la sala:
 
@@ -142,7 +155,12 @@ Límites conocidos: no hay revocación de tokens antes de su vencimiento; la lim
 | Motor compartido en un módulo | Una sola fuente de verdad para navegador, servidor y generador del mockup | Duplicar la lógica en el backend |
 | Gráficos en SVG propio | Menos dependencias y control total del estilo | Librerías de gráficos |
 | Salas en lugar de multi-inquilino real | Permite varias demostraciones simultáneas sin cuentas por persona | Una base por visitante |
+| Malla calculada en cliente y servidor, estado mínimo guardado | Una sola fuente de verdad (el mismo módulo), sin guardar un resultado derivado que pueda quedar desactualizado; la vigencia de la aprobación se controla con un número de versión | Guardar la malla calculada en SQLite: habría que invalidarla en cada cambio de parámetros |
 | Reloj simulado en el cliente | Permite recorrer el día (07:30 a 16:30) en minutos; la hora real no importa para la demo | Reloj en servidor: sesiones del mismo caso no podrían explorar horas distintas |
+
+## Consistencia del estado en el cliente
+
+El cliente sondea el estado cada 1,2 s y también aplica la respuesta de cada acción. Para que una consulta periódica lenta no pise el resultado de una acción reciente, cada petición lleva un número y se descarta toda respuesta más antigua que la ya aplicada (`store-api.jsx`). La gobernanza guarda las activaciones simultáneas: los cambios del checklist parten del último valor local y, mientras haya alguno en vuelo, el sondeo no sobrescribe el checklist; al terminar el último se vuelve a consultar el estado.
 
 ## Despliegue y entornos
 
@@ -152,4 +170,5 @@ Ver [despliegue](despliegue.md). Variables de entorno del servidor: `PORT` (3001
 
 - El reloj simulado es local a cada sesión: dos pestañas pueden mostrar horas distintas. El servidor solo guarda `simMin` para rotular la trazabilidad.
 - La interfaz muestra el nombre de la cuenta autenticada. El caso de la demostración pertenece siempre a Laura Mendoza (Turbaco), por lo que solo esa cuenta recibe la confirmación activa del Nivel 2; con otra cuenta de colaborador no aparece. En producción el caso lo generaría la detección automática, no un botón.
+- La malla no alimenta el semáforo ni el recomendador de redistribución: estos usan el personal típico del histórico y las ausencias confirmadas. Es un acople pendiente (ver [hoja de ruta](hoja-de-ruta.md)).
 - Una sola instancia: la base SQLite y el limitador de intentos están en memoria o archivo local, sin escalado horizontal.

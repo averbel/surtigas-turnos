@@ -14,11 +14,11 @@ Verificada contra `server/index.js`. Base: `http://localhost:3001`. Todas las ru
 
 | Código | Cuándo |
 |---|---|
-| 400 | Dato inválido (código de sala, texto de corrección, desactivarse a sí mismo) |
+| 400 | Dato inválido (código de sala, texto de corrección, desactivarse a sí mismo, día fuera de lunes a viernes en la malla) |
 | 401 | Sin token, token falso o vencido, usuario inexistente, acceso desactivado en la sala, credenciales incorrectas |
 | 403 | Rol sin permiso; en el ingreso, acceso desactivado en esa sala |
-| 404 | Recurso no encontrado o de otra sala; ruta `/api/*` desconocida |
-| 409 | La acción no corresponde al estado actual del caso o la recomendación |
+| 404 | Recurso no encontrado o de otra sala; colaborador que no está en la plantilla de la malla; ruta `/api/*` desconocida |
+| 409 | La acción no corresponde al estado actual del caso o la recomendación; aprobar una malla con incumplimientos duros; abrir el caso de la demostración cuando la malla programa una ausencia ese día (Nivel 0) |
 | 429 | Más de 20 intentos de ingreso por minuto desde una IP |
 | 500 | Error interno (`Error interno del servidor.`) |
 
@@ -38,6 +38,10 @@ Verificada contra `server/index.js`. Base: `http://localhost:3001`. Todas las ru
 | POST | `/api/corrections` | colaborador |
 | POST | `/api/demo/trigger` | Cualquier rol |
 | POST | `/api/demo/reset` | Cualquier rol |
+| GET | `/api/malla` | Cualquier rol |
+| PUT | `/api/malla/absences` | encargado |
+| PUT | `/api/malla/settings` | encargado |
+| POST | `/api/malla/approve` | encargado |
 | POST | `/api/cases/current/respond` | colaborador |
 | POST | `/api/cases/current/authorized` | encargado |
 | POST | `/api/cases/current/confirm` | encargado |
@@ -53,8 +57,10 @@ Devuelto por `GET /api/state` y por las rutas que modifican el caso.
 ```json
 {
   "room": "ABC123",
-  "params": { "waitOk": 20, "waitWarn": 45, "maxKm": 60, "muScale": 1 },
+  "params": { "waitOk": 20, "waitWarn": 45, "maxKm": 60, "muScale": 1, "maxWeeklyHours": 42 },
   "governance": { "th": false, "legal": false, "ley": false, "comm": false },
+  "malla": { "absences": [ { "op": "op26", "dow": 4, "kind": "incapacidad" } ], "rotation": true, "version": 3,
+             "approved": { "version": 2, "at": 1760000000000, "by": "Marta Ríos", "stale": true } },
   "caseState": { "id": 1, "person": "Laura Mendoza", "office": "tur", "stage": "escalado",
                  "level": 3, "since": 1760000000000, "deadline": 1760000019500,
                  "note": "Sin respuesta del colaborador", "resolution": null, "confirmedAt": null },
@@ -69,6 +75,8 @@ Devuelto por `GET /api/state` y por las rutas que modifican el caso.
 
 | Campo | Descripción |
 |---|---|
+| `params` | Parámetros de la sala; `maxWeeklyHours` es el tope de horas semanales de la malla (30 a 60, por defecto 42) |
+| `malla` | Estado de la malla de la sala (ver [Objeto malla](#objeto-malla)). No incluye la malla calculada: el cliente la genera con el mismo motor (`src/malla.js`) a partir de estos datos y de los parámetros |
 | `caseState` | Último caso de la sala o `null`. `stage`: `no_registrado`, `consultando`, `escalado`, `ausencia_confirmada`, `resuelto`. `level`: 1 a 3. `since` y `deadline` en ms epoch; `confirmedAt` en minutos simulados. `resolution`: `registro_tardio`, `confirmado_colaborador` o `reasignacion` |
 | `rec` | Última recomendación del caso actual o `null` (ver abajo) |
 | `moves` | Traslados aprobados; `at` en minutos simulados |
@@ -94,6 +102,28 @@ Devuelto por `GET /api/state` y por las rutas que modifican el caso.
 ```
 
 `status`: `pendiente`, `aprobada`, `rechazada`. `applied`: `move` o `virtual` cuando está aprobada. `mode`: `presencial` o `virtual`. Si ninguna oficina puede prestar personal, `donor` es `null` y `scenarios` es `[]` (solo se devuelven `target`, `targetStaff`, `baseWait`, `peakAt` y `lambda`). Valores de ejemplo calculados con el motor para el viernes 13:05 con una ausencia en Turbaco.
+
+### Objeto malla
+
+Lo devuelven `GET /api/state` (campo `malla`) y, con el resumen y las reglas, `GET /api/malla`.
+
+```json
+{
+  "absences": [ { "op": "op26", "dow": 4, "kind": "incapacidad" } ],
+  "rotation": true,
+  "version": 3,
+  "approved": { "version": 2, "at": 1760000000000, "by": "Marta Ríos", "stale": true }
+}
+```
+
+| Campo | Descripción |
+|---|---|
+| `absences` | Ausencias programadas: `op` (id del colaborador en `roster.json`), `dow` (0 lunes a 4 viernes) y `kind` (`incapacidad`, `permiso` o `vacaciones`) |
+| `rotation` | Si el personal flexible puede cambiar de oficina |
+| `version` | Sube con cada cambio de ausencias, de rotación o de parámetros del administrador |
+| `approved` | `null` si nunca se aprobó. Si no, versión aprobada, momento (ms epoch), quién y `stale`: verdadero si la versión actual ya no coincide con la aprobada |
+
+Las rutas de la malla son por sala. Ver [malla de turnos](malla-de-turnos.md).
 
 ### Usuario público
 
@@ -167,12 +197,13 @@ Rol: admin. Cuerpo y límites (los valores se acotan, no se rechazan):
 | `waitWarn` | 5 | 180 | 45 |
 | `maxKm` | 1 | 500 | 60 |
 | `muScale` | 0,3 | 2 | 1 |
+| `maxWeeklyHours` | 30 | 60 | 42 |
 
-Respuesta 200: `{ "params": {...} }`. Registra la acción en la trazabilidad. La interfaz usa rangos más estrechos que el servidor (por ejemplo `waitOk` de 5 a 40).
+Respuesta 200: `{ "params": {...} }`. Registra la acción en la trazabilidad e incrementa la versión de la malla (una aprobación previa queda vencida). Si un campo falta, se usa su valor por defecto, no el anterior. La interfaz usa rangos más estrechos que el servidor (por ejemplo `waitOk` de 5 a 40), salvo `maxWeeklyHours`, que usa 30 a 60.
 
 ```bash
 curl -X PUT http://localhost:3001/api/params -H "Authorization: Bearer $ADM" \
-  -H 'Content-Type: application/json' -d '{"waitOk":15,"waitWarn":30,"maxKm":60,"muScale":1}'
+  -H 'Content-Type: application/json' -d '{"waitOk":15,"waitWarn":30,"maxKm":60,"muScale":1,"maxWeeklyHours":42}'
 ```
 
 ### PUT /api/governance
@@ -230,7 +261,14 @@ curl -X POST http://localhost:3001/api/corrections -H "Authorization: Bearer $CO
 
 ### POST /api/demo/trigger
 
-Cualquier rol. Simula «persona no registrada»: borra recomendaciones, traslados y ausencias de la sala, crea un caso nuevo en Nivel 1 para Laura Mendoza (Turbaco) y guarda `simMin`. Cuerpo opcional: `{ "simMin": número }` (por defecto 785, es decir 13:05). Respuesta 200: estado.
+Cualquier rol. Simula «persona no registrada»: borra recomendaciones, traslados y ausencias de la sala, crea un caso nuevo en Nivel 1 para Laura Mendoza (Turbaco) y guarda `simMin`. Cuerpo opcional: `{ "simMin": número, "dow": 0 a 4 }` (por defecto 785, es decir 13:05, y 4, viernes).
+
+Antes de crear el caso aplica el Nivel 0 contra la malla de la sala:
+
+| Código | Cuando |
+|---|---|
+| 200 | Estado. La trazabilidad incluye «Nivel 0 · Malla vN sincronizada: Laura Mendoza figura en Turno X (…) en Oficina» antes de la entrada del Nivel 1 |
+| 409 | Laura Mendoza tiene una ausencia programada ese día en la malla (incapacidad, permiso o vacaciones). No se crea el caso: no es «no registrado» |
 
 En producción esta señal la daría el cruce entre la malla de turnos y la asistencia.
 
@@ -241,7 +279,7 @@ curl -X POST http://localhost:3001/api/demo/trigger -H "Authorization: Bearer $T
 
 ### POST /api/demo/reset
 
-Cualquier rol. Borra recomendaciones, traslados, ausencias, casos y trazabilidad de la sala, restablece `lauraIn` y deja la entrada «Malla de turnos aprobada sincronizada (Nivel 0)». No borra parámetros, gobernanza ni asistencia. Respuesta 200: estado.
+Cualquier rol. Borra recomendaciones, traslados, ausencias, casos y trazabilidad de la sala, restablece `lauraIn`, reinicia la malla (sin ausencias, rotación activa, versión 1, sin aprobar) y deja la entrada «Malla de turnos aprobada sincronizada (Nivel 0)». No borra parámetros (incluido el tope de horas), gobernanza ni asistencia. Respuesta 200: estado.
 
 ### POST /api/cases/current/respond
 
@@ -317,6 +355,51 @@ Rol: encargado. Cuerpo: `{ "approve": bool, "scenario": "move" | "virtual", "sim
 curl -X POST http://localhost:3001/api/recommendations/4/decision -H "Authorization: Bearer $ENC" \
   -H 'Content-Type: application/json' -d '{"approve":true,"scenario":"move","simMin":790}'
 ```
+
+### GET /api/malla
+
+Cualquier rol. Respuesta 200: el objeto malla (`absences`, `rotation`, `version`, `approved`) más `summary` (cobertura, déficit, peor espera, colaboradores, turnos programados, horas máximas, ausencias, turnos de rotación e incumplimientos duros) y `violations` (lista de `{ level, code, text, ... }` con `level` `crit` o `warn`). Se calcula con los parámetros actuales de la sala.
+
+```bash
+curl -H "Authorization: Bearer $ENC" http://localhost:3001/api/malla
+```
+
+### PUT /api/malla/absences
+
+Rol: encargado. Programa o quita una ausencia. Cuerpo: `{ "op": "op26", "dow": 4, "absent": true, "kind": "incapacidad", "simMin": número }`.
+
+| Campo | Notas |
+|---|---|
+| `op` | Id del colaborador en `src/data/roster.json` |
+| `dow` | Entero de 0 (lunes) a 4 (viernes) |
+| `absent` | `true` programa la ausencia; otro valor la quita |
+| `kind` | `incapacidad`, `permiso` o `vacaciones`; si es otro valor, se usa `permiso` |
+
+| Código | Cuando |
+|---|---|
+| 200 | Estado. La versión de la malla sube y queda en la trazabilidad |
+| 400 | `El día debe estar entre lunes y viernes.` |
+| 404 | `Colaborador no encontrado en la plantilla.` |
+
+```bash
+curl -X PUT http://localhost:3001/api/malla/absences -H "Authorization: Bearer $ENC" \
+  -H 'Content-Type: application/json' -d '{"op":"op26","dow":4,"absent":true,"kind":"incapacidad"}'
+```
+
+### PUT /api/malla/settings
+
+Rol: encargado. Activa o desactiva la rotación del personal flexible. Cuerpo: `{ "rotation": bool, "simMin": número }`. Respuesta 200: estado. La versión de la malla sube (una aprobación previa queda vencida).
+
+### POST /api/malla/approve
+
+Rol: encargado. Aprueba la versión actual de la malla. El servidor recalcula la malla con los parámetros de la sala.
+
+| Código | Cuando |
+|---|---|
+| 200 | Estado con `malla.approved` en la versión actual y `stale: false` |
+| 409 | Hay incumplimientos duros (por ejemplo, un colaborador por encima del tope de horas semanales). Cuerpo: `{ "error": "No se puede aprobar: ...", "violations": [ ... ] }` con las reglas de nivel `crit` |
+
+Las advertencias de cobertura no bloquean la aprobación; la trazabilidad registra cuántas hubo.
 
 ## Flujo completo de ejemplo
 

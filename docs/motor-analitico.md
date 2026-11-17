@@ -2,6 +2,8 @@
 
 Implementado en `src/engine.js` (199 líneas, sin dependencias salvo `historico.json`). Lo usan el navegador (semáforo, gráficas), el servidor (recomendaciones) y el generador del mockup. Las ecuaciones se escriben en texto plano.
 
+La malla de turnos (`src/malla.js`) se apoya en este mismo modelo: reutiliza `λ`, `μ`, `κ`, Erlang C y la cola fluida para calcular el personal requerido por franja y la espera pico prevista de cada programación. Ver [malla de turnos](malla-de-turnos.md).
+
 ## Resumen
 
 Para cada oficina `o`, hora `h` y personal vigente `s`:
@@ -130,11 +132,18 @@ El déficit de personal (`staffDeficit`) es el menor `k` de 0 a 8 colaboradores 
 
 - `mu` por oficina coincide con 60 / atención media histórica en minutos (atenciones por hora por servidor, entre 4,7 en Cartagena y 10,25 en El Carmen de Bolívar).
 - `κ` por oficina se ajustó contra la espera horaria observada (8:00 a 16:00), según `historico.json` (`calibracion.metodo`). Valores entre 0,58 (Corozal) y 1,48 (Lorica). Los valores mayores que 1 aparecen en oficinas de un solo colaborador (Magangué, Lorica, Mompox, Caucasia, Planeta Rica): el ajuste los eleva para reproducir la espera observada.
-- Error medio absoluto reportado: 7,6 min (`calibracion.maeMin`) sobre una espera observada de 0 a 110 min (`rangoEsperaObservadaMin`).
-- Verificación independiente: recalculando con el promedio de `dow = -1` (sin escalado por día), la espera simulada de las 14 oficinas frente a `waitObs` en las horas 8 a 16 da un error medio absoluto de aproximadamente 7,5 min sobre 126 puntos, consistente con el valor reportado.
+- Error medio absoluto reportado: 7,5 min (`calibracion.maeMin`) sobre una espera observada de 0 a 110 min (`rangoEsperaObservadaMin`).
+- Reproducción: `npm run calibrar -- --dry` recalcula `κ` de cada oficina y reporta un error medio global de 7,5 min. El cálculo usa el promedio de la semana (sin escalado por día), las horas 8 a 16 y solo las franjas con al menos 2 llegadas por hora (97 puntos oficina-hora).
 - La pantalla del administrador «Parámetros del motor» muestra el modelo (línea) frente a la espera real (puntos) para las seis primeras oficinas.
 
-El script de calibración no forma parte del repositorio; el resultado queda en `historico.json`.
+### Scripts de datos
+
+| Script | Qué hace |
+|---|---|
+| `scripts/agregar-digiturno.py` | Lee la exportación en Excel de Digiturno y escribe en `src/data/historico.json` solo agregados por oficina y hora (demanda, concurrencia de operadores, espera observada, tiempos, abandono). No escribe identificadores de usuarios ni de operadores ni contratos. Requiere pandas y openpyxl. Conserva los `κ` y la calibración previos |
+| `scripts/calibrar-kappa.mjs` (`npm run calibrar`) | Busca para cada oficina el `κ` (0,4 a 1,6, paso 0,02) que minimiza el error absoluto medio frente a la espera observada, y escribe `κ` y el error global en `historico.json`. Con `--dry` solo imprime |
+
+Limitación de verificación: el script de agregación se ejecutó de punta a punta con datos sintéticos del mismo formato, pero no se pudo contrastar con el Excel real porque el archivo ya no estaba disponible. No está comprobado que reproduzca exactamente el `historico.json` versionado.
 
 ## Algoritmo de recomendación
 
@@ -198,6 +207,7 @@ Viernes 13:05, Turbaco con una ausencia confirmada (queda con 1 colaborador), pa
 | `waitWarn` | 45 min | 5 a 180 | 20 a 90 (paso 5) | Umbral de «crítica»; también el máximo de espera tolerable para un donante |
 | `maxKm` | 60 km | 1 a 500 | 10 a 250 (paso 10) | Por encima de este radio el motor propone apoyo virtual |
 | `muScale` | 1,0 | 0,3 a 2 | 0,7 a 1,3 (paso 0,05) | Escala `μ` de todas las oficinas |
+| `maxWeeklyHours` | 42 h | 30 a 60 | 30 a 60 | No lo usa este motor: es el tope de horas semanales de la [malla de turnos](malla-de-turnos.md) |
 | `dow` | 4 (viernes) | | Selector Lun a Vie | Factor del día; no se guarda en el servidor |
 
 Los parámetros se guardan por sala. Las referencias de los umbrales: espera media histórica de 37,2 min y 40,4 % de los turnos con espera mayor a 30 min.
@@ -211,5 +221,6 @@ Los parámetros se guardan por sala. Las referencias de los umbrales: espera med
 - Un solo servicio y una sola cola por oficina: no distingue tipos de trámite ni prioridades.
 - No modela abandono ni reintentos de clientes; el abandono histórico (6,8 %) no retroalimenta la demanda.
 - Un donante presta un solo colaborador a la vez; los efectos acumulados de varias redistribuciones se recalculan con el personal vigente, no se optimizan en conjunto.
-- La capacidad se calibra con el personal típico (31 colaboradores sumando las 14 oficinas en `historico.json`), no con la malla real de cada día.
+- La capacidad se calibra con el personal típico (31 colaboradores sumando las 14 oficinas en `historico.json`), no con la malla de cada día. La malla de turnos no alimenta el semáforo ni las recomendaciones de este motor.
+- No hay pruebas unitarias de `engine.js` con casos de referencia; se ejerce a través de las pruebas de la malla y de la API.
 - La red está estructuralmente corta de capacidad por la mañana en los días de alta demanda: la redistribución no crea capacidad, la mueve. Ver [hallazgos](hallazgos-datos.md).

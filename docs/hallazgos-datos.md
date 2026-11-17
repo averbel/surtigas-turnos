@@ -16,7 +16,7 @@ Principios de la agregación:
 
 - Solo se versionan agregados: por oficina, la demanda horaria media, la concurrencia horaria de operadores, la espera horaria observada, tiempos y porcentajes. No hay registros individuales.
 - No se incluyen identificadores de usuarios ni de operadores, ni contratos. Los operadores aparecen únicamente como conteos (por oficina y en la red).
-- El script que produjo el JSON desde la exportación de Digiturno no forma parte de este repositorio; el JSON es el artefacto versionado. La interpretación de los campos que sigue proviene del uso que el código hace de ellos.
+- `scripts/agregar-digiturno.py` agrega la exportación de Digiturno en este formato y `scripts/calibrar-kappa.mjs` recalibra `kappa`. El script de agregación se probó con datos sintéticos del mismo formato, pero no se pudo contrastar con el Excel real (el archivo ya no estaba disponible), así que no está comprobado que reproduzca exactamente el JSON versionado, que es el artefacto de referencia. La interpretación de los campos que sigue proviene del uso que el código hace de ellos.
 
 Campos por oficina del JSON:
 
@@ -133,4 +133,4 @@ Donantes con holgura (oficinas con al menos 2 colaboradores cuya espera se manti
 - Un solo mes (mayo de 2026) y 19 días hábiles; sin estacionalidad ni festivos.
 - Promedios: no se conserva la variabilidad diaria.
 - La suma de `lam` (1.196 por día) es consistente con 22.611 / 19 = 1.190 turnos por día.
-- Las cifras del modelo dependen de la calibración (error medio de 7,6 min); ver [motor analítico](motor-analitico.md).
+- Las cifras del modelo dependen de la calibración (error medio de 7,5 min); ver [motor analítico](motor-analitico.md).

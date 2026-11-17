@@ -42,7 +42,19 @@ npm run server   # API en http://localhost:3001
 npm run dev      # web en http://localhost:5173 con proxy de /api hacia :3001
 ```
 
-Comprobación: `curl http://localhost:3001/api/health`. Pruebas: `npm run test:api` (ver [pruebas](pruebas.md)).
+Comprobación: `curl http://localhost:3001/api/health`. Pruebas: `npm run test:malla` (14 pruebas unitarias, sin servidor), `npm run test:api` (58 pruebas, con el servidor en marcha) o `npm test` (ambas en orden). Ver [pruebas](pruebas.md).
+
+## Scripts de datos
+
+No forman parte del despliegue ni se ejecutan en el servidor; sirven para regenerar `src/data/historico.json` antes de compilar.
+
+| Comando | Qué hace |
+|---|---|
+| `python scripts/agregar-digiturno.py "<archivo.xlsx>" [--out src/data/historico.json]` | Agrega la exportación de Digiturno en `historico.json` (solo agregados por oficina y hora, sin datos personales). Requiere Python con pandas y openpyxl |
+| `npm run calibrar` | Recalibra `κ` por oficina y escribe `κ` y el error medio global (7,5 min) en `historico.json` |
+| `npm run calibrar -- --dry` | Igual, pero solo imprime y no escribe |
+
+Después de cambiar `historico.json` o `src/data/roster.json` hay que recompilar la web (`npm run build`) y reiniciar el servidor, porque ambos archivos se empaquetan. El script de agregación se probó con datos sintéticos del mismo formato; no se pudo contrastar con el Excel real. La plantilla `roster.json` es ficticia (ver [malla de turnos](malla-de-turnos.md#cómo-reemplazar-la-plantilla-ficticia-por-la-nómina-real)).
 
 ## Docker
 
@@ -117,7 +129,7 @@ Netlify es equivalente: `netlify.toml` define `npm run build` y publica `dist`.
 
 ## Integración continua
 
-`.github/workflows/ci.yml` se ejecuta en cada push a `main` y en cada pull request: instala con `npm ci`, compila, levanta el servidor con un `DATA_DIR` temporal, espera `/api/health` y ejecuta las 42 pruebas.
+`.github/workflows/ci.yml` se ejecuta en cada push a `main` y en cada pull request: instala con `npm ci`, compila, levanta el servidor con un `DATA_DIR` temporal, espera `/api/health` y ejecuta las pruebas: la unitaria del motor de malla (`npm run test:malla`, antes de levantar el servidor) y las 58 de la API (`npm run test:api`).
 
 ## Cómo actualizar
 
@@ -128,7 +140,7 @@ Netlify es equivalente: `netlify.toml` define `npm run build` y publica `dist`.
 | Docker | `docker build` de nuevo, detener y reiniciar el contenedor con el mismo volumen |
 | Local | `git pull`, `npm install` y `npm start` |
 
-Antes de publicar: `npm run build` y, con el servidor en marcha, `npm run test:api`.
+Antes de publicar: `npm run build` y, con el servidor en marcha, `npm test` (14 unitarias y 58 de API).
 
 El esquema se crea con `CREATE TABLE IF NOT EXISTS` y una migración que añade la columna `room`; no hay un sistema de migraciones versionadas, de modo que un cambio de esquema futuro requiere agregar su propia migración.
 
@@ -136,7 +148,7 @@ El esquema se crea con `CREATE TABLE IF NOT EXISTS` y una migración que añade 
 
 | Objetivo | Cómo |
 |---|---|
-| Limpiar el caso de una sala | Botón «Reiniciar demo» (`POST /api/demo/reset`): borra casos, recomendaciones, traslados, ausencias y trazabilidad de esa sala |
+| Limpiar el caso de una sala | Botón «Reiniciar demo» (`POST /api/demo/reset`): borra casos, recomendaciones, traslados, ausencias y trazabilidad de esa sala, y reinicia su malla de turnos (sin ausencias programadas ni aprobación) |
 | Empezar en una sala nueva | «Sala nueva» en el ingreso |
 | Borrar todo (local o Docker) | Detener el servidor y borrar `DATA_DIR` (`server/data` o el volumen); al arrancar se recrea con las cuentas de demostración |
 | Borrar todo (Render gratuito) | Reiniciar o redesplegar el servicio (disco efímero) |
@@ -149,4 +161,4 @@ El esquema se crea con `CREATE TABLE IF NOT EXISTS` y una migración que añade 
 - [ ] `AUTH_SECRET` definido (no depender del archivo `.secret` en discos efímeros).
 - [ ] `DEMO_PASSWORD` distinta de la de por defecto si la URL es pública.
 - [ ] `DATA_DIR` en un disco persistente si los datos importan.
-- [ ] Las 42 pruebas pasan contra la URL desplegada.
+- [ ] Las 58 pruebas de la API pasan contra la URL desplegada (`node server/test-api.mjs <URL>`); las 14 unitarias de la malla se ejecutan en local o en CI.
