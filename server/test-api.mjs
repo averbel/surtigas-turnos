@@ -13,6 +13,9 @@ const call = async (method, p, body, token) => {
 }
 const login = async (u, room) => (await call('POST', '/api/auth/login', { username: u, password: PW, room })).j?.token
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+// Si el servidor usa tiempos propios (LEVEL1_TO_2_MS / LEVEL2_WINDOW_MS), ejecuta la prueba con las mismas variables.
+const L1 = Number(process.env.LEVEL1_TO_2_MS) || 3500
+const L2 = Number(process.env.LEVEL2_WINDOW_MS) || 16000
 const A = 'TESTA1', B = 'TESTB2'
 
 const health = await call('GET', '/api/health')
@@ -45,10 +48,10 @@ const stB = (await call('GET', '/api/state', null, encB)).j
 ok('otra sala no ve el caso (aislamiento)', stB.caseState == null && stB.room === B)
 ok('el ID de recomendación de otra sala no es accesible → 404', (await call('POST', '/api/recommendations/1/decision', { approve: false }, encB)).s === 404)
 
-await sleep(3800)
+await sleep(L1 + 300)
 st = (await call('GET', '/api/state', null, col)).j
 ok('avanza a Nivel 2 por tiempo', st.caseState.stage === 'consultando' && st.caseState.level === 2)
-await sleep(16500)
+await sleep(L2 + 500)
 st = (await call('GET', '/api/state', null, enc)).j
 ok('escala a Nivel 3 sin respuesta', st.caseState.stage === 'escalado' && st.caseState.level === 3)
 st = (await call('POST', '/api/cases/current/confirm', { simMin: 785, dow: 4 }, enc)).j
@@ -71,7 +74,7 @@ if (st.rec.donor) {
 
 // Aprobación: nueva demo para cubrir el camino feliz
 await call('POST', '/api/demo/trigger', { simMin: 785 }, enc)
-await sleep(3800 + 16500)
+await sleep(L1 + 300 + L2 + 500)
 await call('GET', '/api/state', null, enc)
 st = (await call('POST', '/api/cases/current/confirm', { simMin: 785, dow: 4 }, enc)).j
 ok('colaborador no puede aprobar → 403', (await call('POST', `/api/recommendations/${st.rec.id}/decision`, { approve: true }, col)).s === 403)
