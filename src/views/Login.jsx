@@ -128,6 +128,7 @@ export default function Login() {
               </div>
             </form>
           )}
+          {busy && <p className="chip" role="status" style={{ marginTop: 16 }}>Conectando con el servidor… si estaba dormido puede tardar hasta un minuto. No cierres la página.</p>}
           {err && !login && <p className="chip crit">{err}</p>}
           <p className="faint" style={{ fontSize: 12, marginTop: 26 }}>
             Datos simulados con fines de demostración. El sistema nunca declara a una persona como ausente por sí solo.

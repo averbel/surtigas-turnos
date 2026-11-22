@@ -30,6 +30,8 @@ ok('login de los 3 roles en la misma sala', enc && col && adm)
 ok('colaborador no puede confirmar ausencia → 403', (await call('POST', '/api/cases/current/confirm', {}, col)).s === 403)
 ok('encargado no puede cambiar parámetros → 403', (await call('PUT', '/api/params', {}, enc)).s === 403)
 ok('colaborador no puede ver usuarios → 403', (await call('GET', '/api/users', null, col)).s === 403)
+ok('colaborador no puede disparar el caso de demo → 403', (await call('POST', '/api/demo/trigger', {}, col)).s === 403)
+ok('colaborador no puede reiniciar la demo → 403', (await call('POST', '/api/demo/reset', {}, col)).s === 403)
 
 // Flujo de la demo
 await call('POST', '/api/demo/reset', {}, enc)

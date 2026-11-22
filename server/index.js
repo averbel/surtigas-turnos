@@ -21,8 +21,10 @@ fs.mkdirSync(DATA_DIR, { recursive: true })
 const PORT = Number(process.env.PORT) || 3001
 
 // Ventanas reales (ms) que representan el proceso de verificación (igual que el frontend).
-const LEVEL1_TO_2 = 3500
-const LEVEL2_WINDOW = 16000
+// Configurables por entorno para que la prueba en vivo sea más holgada (p. ej. LEVEL2_WINDOW_MS=45000).
+const envMs = (name, def) => { const v = Number(process.env[name]); return Number.isFinite(v) && v >= 1000 ? v : def }
+const LEVEL1_TO_2 = envMs('LEVEL1_TO_2_MS', 3500)
+const LEVEL2_WINDOW = envMs('LEVEL2_WINDOW_MS', 16000)
 const ROOM_TTL_MS = 24 * 3600 * 1000
 const DEMO_PERSON = { username: 'laura.mendoza', name: 'Laura Mendoza', office: 'tur' }
 const ROOM_RE = /^[A-Z0-9]{4,8}$/
@@ -149,6 +151,8 @@ function rateLimited(ip) {
   attempts.set(ip, a)
   return a.n > 20
 }
+// Evita que el mapa de intentos crezca sin límite.
+setInterval(() => { const lim = Date.now() - 60000; for (const [ip, a] of attempts) if (a.t < lim) attempts.delete(ip) }, 5 * 60 * 1000).unref()
 
 function auth(...roles) {
   return (req, res, next) => {
@@ -349,7 +353,7 @@ app.post('/api/corrections', auth('colaborador'), (req, res) => {
 })
 
 // Demo: dispara «persona no registrada» (en producción lo detectaría el cruce malla vs. asistencia).
-app.post('/api/demo/trigger', auth(), (req, res) => {
+app.post('/api/demo/trigger', auth('encargado', 'admin'), (req, res) => {
   const room = req.room
   const simMin = num(req.body?.simMin, 13 * 60 + 5)
   const dow = Math.min(4, Math.max(0, num(req.body?.dow, 4)))
@@ -368,7 +372,7 @@ app.post('/api/demo/trigger', auth(), (req, res) => {
   audit(room, 'Sistema', `Nivel 1 · ${DEMO_PERSON.name} aparece como «no registrado» en ${officeById(DEMO_PERSON.office).name}. No se declara ausencia.`, 'warn', simMin)
   res.json(fullState(room, req.user))
 })
-app.post('/api/demo/reset', auth(), (req, res) => {
+app.post('/api/demo/reset', auth('encargado', 'admin'), (req, res) => {
   const room = req.room
   for (const t of ['recs', 'moves', 'absences', 'cases', 'audit']) db.prepare(`DELETE FROM ${t} WHERE room = ?`).run(room)
   kvSet(room, 'lauraIn', false)
