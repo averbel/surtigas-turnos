@@ -121,9 +121,11 @@ export function Sidebar({ items, active, onChange }) {
 
 // Barra de demo: permite recorrer el «ejemplo de aplicación» del documento de la Fase 1.
 export function Director() {
-  const { caseState, startCase, reset, rec } = useApp()
+  const { caseState, startCase, reset, rec, role, login } = useApp()
+  // Con servidor, solo el encargado y el administrador pueden disparar o reiniciar la demo.
+  const canDrive = !(login && role === 'colaborador')
   let label = 'Simular: persona «no registrada» · vie 13:05'
-  let hint = 'Ejemplo de aplicación con datos reales'
+  let hint = canDrive ? 'Ejemplo de aplicación con datos reales' : 'Demostración: el encargado inicia el caso desde su vista'
   let action = startCase
   let icon = <Zap size={15} />
   if (caseState) {
@@ -142,9 +144,11 @@ export function Director() {
     <motion.div className="director" initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.6, type: 'spring', stiffness: 260, damping: 24 }}>
       <span style={{ color: 'var(--orange)', fontWeight: 700 }}>DEMO</span>
       <span className="muted" style={{ maxWidth: 360 }}>{hint}</span>
-      <button className="btn btn-flame" style={{ padding: '8px 14px', borderRadius: 99 }} onClick={action}>
-        {icon} {label} <ChevronRight size={14} />
-      </button>
+      {canDrive && (
+        <button className="btn btn-flame" style={{ padding: '8px 14px', borderRadius: 99 }} onClick={action}>
+          {icon} {label} <ChevronRight size={14} />
+        </button>
+      )}
     </motion.div>
   )
 }
