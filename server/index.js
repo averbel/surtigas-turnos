@@ -89,7 +89,8 @@ function seedUsers() {
 seedUsers()
 
 function audit(room, actor, text, tone, simMin) {
-  const t = simMin != null ? fmtHour(simMin / 60) : new Date().toTimeString().slice(0, 5)
+  // Todas las entradas usan la hora simulada de la sala, para que la línea de tiempo sea coherente.
+  const t = fmtHour((simMin != null ? simMin : simNow(room)) / 60)
   db.prepare('INSERT INTO audit (room, ts, t, actor, text, tone) VALUES (?, ?, ?, ?, ?, ?)').run(room, Date.now(), t, actor, text, tone || null)
 }
 
@@ -103,7 +104,7 @@ function ensureRoom(room) {
   kvSet(room, 'malla', { absences: [], rotation: MALLA_DEFAULTS.rotation, version: 1, approved: null })
   kvSet(room, 'lauraIn', false)
   kvSet(room, 'inactive', [])
-  audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13)
+  audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13 * 60)
 }
 const newRoomCode = () => Array.from(crypto.randomBytes(6), (b) => ROOM_ALPHABET[b % ROOM_ALPHABET.length]).join('')
 
@@ -377,7 +378,7 @@ app.post('/api/demo/reset', auth('encargado', 'admin'), (req, res) => {
   for (const t of ['recs', 'moves', 'absences', 'cases', 'audit']) db.prepare(`DELETE FROM ${t} WHERE room = ?`).run(room)
   kvSet(room, 'lauraIn', false)
   kvSet(room, 'malla', { absences: [], rotation: MALLA_DEFAULTS.rotation, version: 1, approved: null })
-  audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13)
+  audit(room, 'Sistema', 'Malla de turnos aprobada sincronizada (Nivel 0).', null, 13 * 60)
   res.json(fullState(room, req.user))
 })
 

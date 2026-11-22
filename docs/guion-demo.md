@@ -65,6 +65,7 @@ Si hay un cuarto de minuto de sobra: pulsar una oficina para mostrar la curva de
 ## Consejos
 
 - No cambiar a la pestaña B antes de iniciar el caso; el aviso del Nivel 2 dura 16 s.
+- El reloj simulado avanza solo: al pulsar «Lun» y «08:00» las cifras cambian un poco con los segundos (a las 08:00 exactas son 10 oficinas críticas; unos minutos después pueden ser 8 o 9). Es normal.
 - Mantener el reloj simulado en marcha: al iniciar el caso se fija en 13:05 del viernes.
 - Si el reloj o el selector cambian el día, «Simular persona no registrada» vuelve a fijar viernes 13:05.
 - La demostración de la malla deja una versión nueva sin aprobar; no hace falta aprobarla. Si quieres mostrar la aprobación, pulsa «Aprobar malla» (con el tope por defecto no hay incumplimientos duros). Un cambio de parámetros del administrador la deja «Vencida».
